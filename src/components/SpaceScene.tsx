@@ -19,13 +19,16 @@ const SpaceScene = (): JSX.Element => {
         {/* Main text */}
         <MainText />
         
-        {/* Planets with atmospheres */}
+        {/* Interactive Planets */}
         <Planet 
           position={[-8, 0, -5]} 
           radius={2} 
           color="#ff4455"
           atmosphereColor="#ff667766"
           rotationSpeed={0.5}
+          name="About Us"
+          description="Click to learn more about our team"
+          link="/about"
         />
         <Planet 
           position={[8, 2, -3]} 
@@ -33,6 +36,9 @@ const SpaceScene = (): JSX.Element => {
           color="#44aaff"
           atmosphereColor="#66ccff66"
           rotationSpeed={0.3}
+          name="Projects"
+          description="Explore our latest projects"
+          link="/projects"
         />
         <Planet 
           position={[0, -6, -2]} 
@@ -40,6 +46,9 @@ const SpaceScene = (): JSX.Element => {
           color="#ffaa44"
           atmosphereColor="#ffcc6666"
           rotationSpeed={0.7}
+          name="Contact"
+          description="Get in touch with us"
+          link="/contact"
         />
 
         {/* Asteroid belts */}

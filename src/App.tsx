@@ -5,14 +5,21 @@ import './App.css'
 import Scene from './components/Scene'
 import SpaceScene from './components/SpaceScene'
 import { Center } from '@react-three/drei'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import AboutPage from './components/AboutPage'
 
 function App() {
   const [count, setCount] = useState(0)
 
   return (
-    <div className="App">
-      <SpaceScene />
-  </div>
+    <Router>
+      <Routes>
+        <Route path="/" element={<SpaceScene />} />
+        <Route path="/about" element={<AboutPage />} />
+        {/* <Route path="/projects" element={<ProjectsPage />} />
+        <Route path="/contact" element={<ContactPage />} /> */}
+      </Routes>
+    </Router>
   )
 }
 
