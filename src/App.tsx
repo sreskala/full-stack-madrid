@@ -4,13 +4,14 @@ import viteLogo from '/vite.svg'
 import './App.css'
 import Scene from './components/Scene'
 import SpaceScene from './components/SpaceScene'
+import { Center } from '@react-three/drei'
 
 function App() {
   const [count, setCount] = useState(0)
 
   return (
     <div className="App">
-    <SpaceScene />
+      <SpaceScene />
   </div>
   )
 }
