@@ -4,6 +4,7 @@ import Planet from './Planet'
 import AsteroidBelt from './AsteroidBelt'
 import Comet from './Comet'
 import MainText from './MainText'
+import Sun from './Sun'
 
 const SpaceScene = (): JSX.Element => {
   return (
@@ -12,6 +13,14 @@ const SpaceScene = (): JSX.Element => {
         {/* Lighting */}
         <ambientLight intensity={0.2} />
         <pointLight position={[10, 10, 10]} intensity={1} />
+
+        <hemisphereLight
+          color="#ffffff"
+          groundColor="#000000"
+          intensity={0.5}
+        />
+
+        <Sun position={[15, 10, -10]} size={5} />
         
         {/* Background stars */}
         <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
