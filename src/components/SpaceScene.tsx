@@ -47,7 +47,7 @@ const SpaceScene = (): JSX.Element => {
           roughnessMap="/textures/planets/8081_earthbump4k.jpg"
           cloudMap="/textures/planets/earthcloudmap.jpg"
         />
-        {/* <Planet 
+        <Planet 
           position={[0, -6, -2]} 
           radius={1} 
           color="#ffaa44"
@@ -56,12 +56,12 @@ const SpaceScene = (): JSX.Element => {
           name="Contact"
           description="Get in touch with us"
           link="/contact"
-          textureMap="/textures/planets/saturn_texture.jpg"
-          normalMap="/textures/planets/saturn_normal.jpg"
-          roughnessMap="/textures/planets/saturn_roughness.jpg"
-          hasRings={true}
-          ringColor="#C7B29A"
-        /> */}
+          textureMap="/textures/planets/plutomap2k.jpg"
+          normalMap="/textures/planets/mars_1k_normal.jpg"
+          roughnessMap="/textures/planets/plutobump2k.jpg"
+          // hasRings={true}
+          // ringColor="#C7B29A"
+        />
 
         {/* Asteroid belts */}
         <AsteroidBelt 
