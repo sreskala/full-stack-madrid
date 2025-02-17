@@ -1,6 +1,6 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Vector3, BufferGeometry, Float32BufferAttribute } from 'three'
+import { Float32BufferAttribute } from 'three'
 import * as THREE from 'three'
 
 interface AsteroidBeltProps {
@@ -29,7 +29,7 @@ const AsteroidBelt = ({ radius, count, width, height }: AsteroidBeltProps): JSX.
     return new Float32BufferAttribute(positions, 3)
   }, [count, radius, width, height])
 
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
     points.current.rotation.y += delta * 0.05
   })
 

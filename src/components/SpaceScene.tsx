@@ -1,10 +1,8 @@
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Text, Stars } from '@react-three/drei'
+import { OrbitControls, Stars } from '@react-three/drei'
 import Planet from './Planet'
 import AsteroidBelt from './AsteroidBelt'
-import Comet from './Comet'
 import MainText from './MainText'
-import Sun from './Sun'
 
 const SpaceScene = (): JSX.Element => {
   return (
@@ -15,7 +13,7 @@ const SpaceScene = (): JSX.Element => {
         <pointLight position={[10, 10, 10]} intensity={1} />
 
         <hemisphereLight
-          color="#ffffff"
+          color="#fffff"
           groundColor="#000000"
           intensity={0.5}
         />
@@ -33,7 +31,7 @@ const SpaceScene = (): JSX.Element => {
           position={[-8, 0, -5]} 
           radius={2} 
           color="#ff4455"
-          atmosphereColor="#ff667766"
+          atmosphereColor="#ff66776"
           rotationSpeed={0.5}
           name="About Us"
           description="Click to learn more about our expertise"
@@ -46,7 +44,7 @@ const SpaceScene = (): JSX.Element => {
           position={[8, 2, -3]} 
           radius={1.5} 
           color="#44aaff"
-          atmosphereColor="#66ccff66"
+          atmosphereColor="#66ccff6"
           rotationSpeed={0.3}
           name="Courses"
           description="Explore our learning paths"
@@ -60,7 +58,7 @@ const SpaceScene = (): JSX.Element => {
           position={[0, -6, -2]} 
           radius={1} 
           color="#ffaa44"
-          atmosphereColor="#ffcc6666"
+          atmosphereColor="#ffcc666"
           rotationSpeed={0.7}
           name="Contact"
           description="Send us an email!"
@@ -80,18 +78,7 @@ const SpaceScene = (): JSX.Element => {
           width={2}
           height={0.2}
         />
-        
-        {/* Comets */}
-        {/* <Comet 
-          startPosition={[-20, 10, -10]} 
-          endPosition={[20, -10, -10]} 
-          duration={10}
-        />
-        <Comet 
-          startPosition={[15, 15, -5]} 
-          endPosition={[-15, -15, -15]} 
-          duration={15}
-        /> */}
+
         
         {/* Controls */}
         <OrbitControls 

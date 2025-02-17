@@ -8,7 +8,7 @@ const MainText = (): JSX.Element => {
       color="#ffffff"
       anchorX="center"
       anchorY="middle"
-      font="src/assets/SpaceCrusaders-x3DP0.ttf"
+      font="/fonts/SpaceCrusaders-x3DP0.ttf"
       //font="/path/to/your/font.ttf" // You'll need to add a font file to your public directory
     >
       Full Stack Madrid

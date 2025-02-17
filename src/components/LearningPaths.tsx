@@ -1,5 +1,5 @@
 // LearningPaths.jsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import emailjs from '@emailjs/browser';
 import { 
   BookOpen, 
@@ -10,13 +10,12 @@ import {
   ChevronRight,
   Clock,
   Target,
-  GraduationCap,
   Loader
 } from 'lucide-react';
 import './LearningPaths.css';
 
 const LearningPaths = () => {
-  const [selectedPath, setSelectedPath] = useState(null);
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<string | null>(null);
@@ -32,7 +31,7 @@ const LearningPaths = () => {
     emailjs.init(import.meta.env.VITE_EMAILJS_PUBLIC_KEY as string); // You'll need to replace this with your actual public key
   }, []);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     setIsSubmitting(true);
     setSubmitStatus(null);
@@ -67,7 +66,7 @@ const LearningPaths = () => {
     setIsSubmitting(false);
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: any) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -238,7 +237,7 @@ const LearningPaths = () => {
           <div 
             key={path.id}
             className={`path-card ${selectedPath === path.id ? 'selected' : ''}`}
-            onClick={() => setSelectedPath(path.id)}
+            onClick={() => setSelectedPath(path.id as string)}
           >
             <div className="path-header">
               {path.icon}
@@ -263,7 +262,9 @@ const LearningPaths = () => {
         <div className="course-details">
           <h2>Course Structure</h2>
           <div className="courses-grid">
-            {learningPaths.find(p => p.id === selectedPath).courses.map((course, index) => (
+            {
+              //@ts-ignore
+            learningPaths.find(p => p.id === selectedPath).courses.map((course, index) => (
               <div key={index} className="course-card">
                 <h3>
                   <BookOpen size={20} />

@@ -1,5 +1,4 @@
 // AboutSection.jsx
-import React from 'react';
 import { 
   Code2, 
   Rocket, 
