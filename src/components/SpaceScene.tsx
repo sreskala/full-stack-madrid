@@ -20,7 +20,7 @@ const SpaceScene = (): JSX.Element => {
           intensity={0.5}
         />
 
-        <Sun position={[15, 10, -10]} size={5} />
+        {/* <Sun position={[15, 10, -10]} size={5} /> */}
         
         {/* Background stars */}
         <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
@@ -36,7 +36,7 @@ const SpaceScene = (): JSX.Element => {
           atmosphereColor="#ff667766"
           rotationSpeed={0.5}
           name="About Us"
-          description="Click to learn more about our team"
+          description="Click to learn more about our expertise"
           link="/about"
           textureMap="/textures/planets/Mars_Map.webp"
           normalMap="/textures/planets/mars_1k_normal.jpg"
@@ -48,9 +48,9 @@ const SpaceScene = (): JSX.Element => {
           color="#44aaff"
           atmosphereColor="#66ccff66"
           rotationSpeed={0.3}
-          name="Projects"
-          description="Explore our latest projects"
-          link="/projects"
+          name="Courses"
+          description="Explore our learning paths"
+          link="/courses"
           textureMap="/textures/planets/8081_earthmap4k.jpg"
           normalMap="/textures/planets/earth_normalmap.jpg"
           roughnessMap="/textures/planets/8081_earthbump4k.jpg"
@@ -63,11 +63,12 @@ const SpaceScene = (): JSX.Element => {
           atmosphereColor="#ffcc6666"
           rotationSpeed={0.7}
           name="Contact"
-          description="Get in touch with us"
-          link="/contact"
+          description="Send us an email!"
+          link="/"
           textureMap="/textures/planets/plutomap2k.jpg"
           normalMap="/textures/planets/mars_1k_normal.jpg"
           roughnessMap="/textures/planets/plutobump2k.jpg"
+          overrideLinkEmail={true}
           // hasRings={true}
           // ringColor="#C7B29A"
         />
@@ -81,7 +82,7 @@ const SpaceScene = (): JSX.Element => {
         />
         
         {/* Comets */}
-        <Comet 
+        {/* <Comet 
           startPosition={[-20, 10, -10]} 
           endPosition={[20, -10, -10]} 
           duration={10}
@@ -90,7 +91,7 @@ const SpaceScene = (): JSX.Element => {
           startPosition={[15, 15, -5]} 
           endPosition={[-15, -15, -15]} 
           duration={15}
-        />
+        /> */}
         
         {/* Controls */}
         <OrbitControls 

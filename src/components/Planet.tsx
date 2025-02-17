@@ -19,6 +19,7 @@ interface PlanetProps {
   cloudMap?: string
   hasRings?: boolean
   ringColor?: string
+  overrideLinkEmail?: boolean
 }
 
 const Planet = ({ 
@@ -35,7 +36,8 @@ const Planet = ({
   roughnessMap = '/textures/planets/default_roughness.jpg',
   cloudMap,
   hasRings,
-  ringColor = '#A7A7A7'
+  ringColor = '#A7A7A7',
+  overrideLinkEmail = false
 }: PlanetProps): JSX.Element => {
   const planetRef = useRef<Mesh>(null!)
   const atmosphereRef = useRef<Mesh>(null!)
@@ -43,6 +45,10 @@ const Planet = ({
   const ringsRef = useRef<Mesh>(null!)
   const [hovered, setHovered] = useState(false)
   const navigate = useNavigate()
+
+  const sendEmail = () => {
+    window.open("mailto:sam.reskala@fullstackmadrid.com")
+  }
 
   // Load textures
   const textures = useTexture({
@@ -83,7 +89,13 @@ const Planet = ({
       position={position}
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
-      onClick={() => navigate(link)}
+      onClick={() => {
+        if (overrideLinkEmail) {
+          sendEmail();
+        } else {
+          navigate(link) 
+        }
+      }}
     >
       {/* Planet core */}
       <mesh ref={planetRef}>

@@ -7,6 +7,7 @@ import SpaceScene from './components/SpaceScene'
 import { Center } from '@react-three/drei'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import AboutPage from './components/AboutPage'
+import LearningPaths from './components/LearningPaths'
 
 function App() {
   const [count, setCount] = useState(0)
@@ -16,6 +17,7 @@ function App() {
       <Routes>
         <Route path="/" element={<SpaceScene />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/courses" element={<LearningPaths />} />
         {/* <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/contact" element={<ContactPage />} /> */}
       </Routes>

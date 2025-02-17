@@ -1,0 +1,219 @@
+/* AboutSection.css */
+/* Reset default margins and ensure proper box-sizing */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Enable scrolling on the body */
+body {
+  overflow-y: auto;
+  min-height: 100vh;
+}
+
+.about-container {
+  max-width: 1024px;
+  margin: 0 auto;
+  padding: 64px 16px;
+  /* Remove any fixed height constraints */
+  min-height: 100%;
+  /* Add some bottom padding to prevent content from being cut off */
+  padding-bottom: 100px;
+  /* Enable container scrolling if needed */
+  overflow-y: auto;
+}
+
+.about-title {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #eee;
+  margin-bottom: 32px;
+  /* Ensure text wraps if needed */
+  word-wrap: break-word;
+}
+
+.about-intro {
+  margin-bottom: 48px;
+}
+
+.about-intro p {
+  font-size: 1.125rem;
+  line-height: 1.75;
+  color: #eee;
+  /* Ensure text wraps properly */
+  word-wrap: break-word;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  margin-bottom: 48px;
+  /* Ensure grid items don't overflow */
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.feature-card {
+  background-color: white;
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  /* Prevent content overflow */
+  overflow: hidden;
+  /* Ensure cards expand to fit content */
+  height: auto;
+}
+
+.feature-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  /* Prevent flex items from shrinking too much */
+  min-height: 40px;
+}
+
+.feature-icon {
+  width: 32px;
+  height: 32px;
+  color: #2563eb;
+  margin-right: 12px;
+  /* Prevent icon from shrinking */
+  flex-shrink: 0;
+}
+
+.feature-header h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+  /* Ensure text wraps if needed */
+  word-wrap: break-word;
+}
+
+.feature-card p {
+  color: #4b5563;
+  line-height: 1.6;
+  margin: 0;
+  /* Ensure text wraps properly */
+  word-wrap: break-word;
+}
+
+.teaching-approach {
+  background-color: #eff6ff;
+  padding: 24px;
+  border-radius: 8px;
+  margin-top: 48px;
+  /* Prevent content overflow */
+  overflow: hidden;
+}
+
+.teaching-approach h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 16px;
+  /* Ensure text wraps if needed */
+  word-wrap: break-word;
+}
+
+.teaching-approach p {
+  color: #4b5563;
+  line-height: 1.6;
+  margin: 0;
+  /* Ensure text wraps properly */
+  word-wrap: break-word;
+}
+
+/* Add responsive padding adjustments */
+@media (max-width: 768px) {
+  .about-container {
+    padding: 32px 16px 64px 16px;
+  }
+  
+  .feature-card {
+    padding: 16px;
+  }
+  
+  .teaching-approach {
+    padding: 16px;
+  }
+}
+
+/* Skills Section Styles */
+.skills-section {
+  margin-top: 64px;
+}
+
+.skills-section h3 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #eee;
+  margin-bottom: 32px;
+}
+
+.skills-category {
+  margin-bottom: 40px;
+}
+
+.skills-category h4 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #eee;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.skills-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.skill-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #f9fafb;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.skill-item:hover {
+  background-color: #f3f4f6;
+  transform: translateY(-2px);
+}
+
+.skill-icon {
+  width: 20px;
+  height: 20px;
+  color: #2563eb;
+  margin-right: 8px;
+}
+
+.skill-item span {
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+/* Add responsive padding adjustments */
+@media (max-width: 768px) {
+  .about-container {
+    padding: 32px 16px 64px 16px;
+  }
+  
+  .feature-card {
+    padding: 16px;
+  }
+  
+  .teaching-approach {
+    padding: 16px;
+  }
+}
