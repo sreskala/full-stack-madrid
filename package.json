@@ -1,6 +1,7 @@
 {
   "name": "full-stack-madrid",
   "private": true,
+  "author": " Sam Reskala",
   "version": "0.0.0",
   "type": "module",
   "scripts": {
