@@ -287,7 +287,7 @@ const LearningPaths = () => {
       <div className="enroll-section">
         <div className="enroll-content">
           <h2>Ready to Start Your Journey?</h2>
-          <p>Choose a learning path and begin your development journey today.</p>
+          <p>Choose a learning path and begin your development journey today!</p>
           <button 
             className="enroll-button"
             onClick={() => setIsModalOpen(true)}
