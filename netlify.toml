@@ -7,6 +7,7 @@
 [build.environment]
   NPM_FLAGS = "--use-npm"
   NODE_VERSION = "20"
+  SECRETS_SCAN_OMIT_KEYS = "VITE_EMAILJS_PUBLIC_KEY,VITE_EMAILJS_SERVICE_ID,VITE_EMAILJS_TEMPLATE_ID"
 
   ## Uncomment to use this redirect for Single Page Applications like create-react-app.
   ## Not needed for static site generators.
