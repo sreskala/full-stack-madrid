@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Mesh, BackSide, Color } from 'three'
+import { Mesh, BackSide, Color, TextureLoader, RepeatWrapping } from 'three'
 import { Html, useTexture } from '@react-three/drei'
 import { useNavigate } from 'react-router-dom'
 
@@ -20,6 +20,7 @@ interface PlanetProps {
   hasRings?: boolean
   ringColor?: string
   overrideLinkEmail?: boolean
+  lowQuality?: boolean // New prop to control level of detail
 }
 
 const Planet = ({ 
@@ -37,7 +38,8 @@ const Planet = ({
   cloudMap,
   hasRings,
   ringColor = '#A7A7A7',
-  overrideLinkEmail = false
+  overrideLinkEmail = false,
+  lowQuality = false
 }: PlanetProps): JSX.Element => {
   const planetRef = useRef<Mesh>(null!)
   const atmosphereRef = useRef<Mesh>(null!)
@@ -45,77 +47,136 @@ const Planet = ({
   const ringsRef = useRef<Mesh>(null!)
   const [hovered, setHovered] = useState(false)
   const navigate = useNavigate()
+  
+  // For texture memory management
+  const [hasInteracted, setHasInteracted] = useState(false)
+
+  // Determine segment count based on quality setting
+  const segments = useMemo(() => lowQuality ? 16 : 64, [lowQuality])
 
   const sendEmail = () => {
     window.open("mailto:sam.reskala@fullstackmadrid.com")
   }
 
-  // Load textures
+  // Use a memo to avoid recreating texture options on every render
+  const textureOptions = useMemo(() => ({
+    anisotropy: lowQuality ? 1 : 4,
+    encoding: 3001, // sRGB encoding
+  }), [lowQuality])
+
+  // Load textures with optimized settings
   const textures = useTexture({
     map: textureMap,
-    normalMap: normalMap,
-    roughnessMap: roughnessMap,
-    // cloudMap: cloudMap
+    normalMap: lowQuality ? null : normalMap, // Skip normal maps in low quality mode
+    roughnessMap: lowQuality ? null : roughnessMap, // Skip roughness maps in low quality mode
   })
+  
+  // Apply texture optimizations
+  useEffect(() => {
+    if (textures.map) {
+      textures.map.anisotropy = textureOptions.anisotropy
+      textures.map.needsUpdate = true
+    }
+    // Only process these in high quality mode
+    if (!lowQuality) {
+      if (textures.normalMap) {
+        textures.normalMap.anisotropy = textureOptions.anisotropy
+        textures.normalMap.needsUpdate = true
+      }
+      if (textures.roughnessMap) {
+        textures.roughnessMap.anisotropy = textureOptions.anisotropy
+        textures.roughnessMap.needsUpdate = true
+      }
+    }
+  }, [textures, textureOptions, lowQuality])
 
-  // const cloudTexture = useTexture(cloudMap ?? "")
-  let cloudTexture;
-  if (cloudMap) {
-    cloudTexture = useTexture(cloudMap)
-  }
+  // Load cloud map separately with optimized settings
+  const cloudTexture = cloudMap && !lowQuality ? useTexture(cloudMap) : null
+
+  // Apply cloud texture optimizations
+  useEffect(() => {
+    if (cloudTexture) {
+      cloudTexture.anisotropy = textureOptions.anisotropy
+      cloudTexture.needsUpdate = true
+    }
+  }, [cloudTexture, textureOptions])
+
+  // Handle interaction state
+  useEffect(() => {
+    if (hovered && !hasInteracted) {
+      setHasInteracted(true)
+    }
+  }, [hovered, hasInteracted])
 
   useFrame((state, delta) => {
-    planetRef.current.rotation.y += delta * (hovered ? rotationSpeed * 2 : rotationSpeed)
-    if (cloudsRef.current) {
-      cloudsRef.current.rotation.y += delta * rotationSpeed * 1.5
+    // Optimize animations with delta time for consistent speed
+    const deltaMultiplier = delta * 60 // Normalize for 60fps
+    
+    // Only rotate if visible to the camera
+    if (planetRef.current) {
+      planetRef.current.rotation.y += deltaMultiplier * 0.01 * (hovered ? rotationSpeed * 2 : rotationSpeed)
     }
-    if (ringsRef.current) {
+    
+    // Only process clouds if they exist and are not in low quality mode
+    if (cloudsRef.current && cloudTexture) {
+      cloudsRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 1.5
+    }
+    
+    // Only process rings if they exist
+    if (ringsRef.current && hasRings) {
       ringsRef.current.rotation.x = -0.5
-      ringsRef.current.rotation.y += delta * rotationSpeed * 0.5
+      ringsRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 0.5
     }
-    atmosphereRef.current.rotation.y += delta * rotationSpeed * 0.5
+    
+    // Always process atmosphere
+    if (atmosphereRef.current) {
+      atmosphereRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 0.5
 
-    // Pulsing atmosphere effect on hover
-    if (hovered) {
-      const scale = 1.2 + Math.sin(state.clock.elapsedTime * 4) * 0.05
-      atmosphereRef.current.scale.set(scale, scale, scale)
-    } else {
-      atmosphereRef.current.scale.set(1.2, 1.2, 1.2)
+      // Pulsing atmosphere effect on hover - simplified when in low quality mode
+      if (hovered && !lowQuality) {
+        const scale = 1.2 + Math.sin(state.clock.elapsedTime * 4) * 0.05
+        atmosphereRef.current.scale.set(scale, scale, scale)
+      } else {
+        atmosphereRef.current.scale.set(1.2, 1.2, 1.2)
+      }
     }
   })
+
+  // Memoize the click handler
+  const handleClick = useMemo(() => () => {
+    if (overrideLinkEmail) {
+      sendEmail()
+    } else {
+      navigate(link)
+    }
+  }, [overrideLinkEmail, link, navigate])
 
   return (
     <group 
       position={position}
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
-      onClick={() => {
-        if (overrideLinkEmail) {
-          sendEmail();
-        } else {
-          navigate(link) 
-        }
-      }}
+      onClick={handleClick}
     >
-      {/* Planet core */}
+      {/* Planet core with adaptive detail */}
       <mesh ref={planetRef}>
-        <sphereGeometry args={[radius, 64, 64]} />
+        <sphereGeometry args={[radius, segments, segments]} />
         <meshPhysicalMaterial 
           map={textures.map}
-          normalMap={textures.normalMap}
-          roughnessMap={textures.roughnessMap}
+          normalMap={!lowQuality ? textures.normalMap : null}
+          roughnessMap={!lowQuality ? textures.roughnessMap : null}
           roughness={0.8}
           metalness={0.2}
           emissive={new Color(color)}
           emissiveIntensity={hovered ? 0.2 : 0}
-          envMapIntensity={1.5}
+          envMapIntensity={lowQuality ? 0.5 : 1.5}
         />
       </mesh>
       
-      {/* Cloud layer */}
-      {cloudMap && cloudTexture &&(
+      {/* Cloud layer - only render in high quality mode or when hovered */}
+      {cloudMap && cloudTexture && !lowQuality && (
         <mesh ref={cloudsRef} scale={1.02}>
-          <sphereGeometry args={[radius, 64, 64]} />
+          <sphereGeometry args={[radius, segments, segments]} />
           <meshStandardMaterial 
             map={cloudTexture}
             transparent={true}
@@ -125,10 +186,10 @@ const Planet = ({
         </mesh>
       )}
 
-      {/* Rings (if enabled) */}
-      {hasRings && (
+      {/* Rings - only render if explicitly enabled and not in low quality mode */}
+      {hasRings && !lowQuality && (
         <mesh ref={ringsRef}>
-          <ringGeometry args={[radius * 1.4, radius * 2.2, 64]} />
+          <ringGeometry args={[radius * 1.4, radius * 2.2, segments]} />
           <meshStandardMaterial 
             color={ringColor}
             transparent={true}
@@ -138,9 +199,9 @@ const Planet = ({
         </mesh>
       )}
       
-      {/* Atmosphere */}
+      {/* Atmosphere - simplified in low quality mode */}
       <mesh ref={atmosphereRef}>
-        <sphereGeometry args={[radius * 1.2, 64, 64]} />
+        <sphereGeometry args={[radius * 1.2, lowQuality ? segments / 2 : segments, lowQuality ? segments / 2 : segments]} />
         <meshPhongMaterial 
           color={atmosphereColor}
           transparent={true}
@@ -150,7 +211,7 @@ const Planet = ({
         />
       </mesh>
 
-      {/* Tooltip */}
+      {/* Tooltip - only show when hovered */}
       {hovered && (
         <Html position={[0, radius * 2, 0]} center style={{ pointerEvents: 'none' }}>
           <div style={{
