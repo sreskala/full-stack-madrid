@@ -53,6 +53,9 @@ const Planet = ({
   // Track loading and error states
   const [hasInteracted, setHasInteracted] = useState(false)
   const [textureLoadFailed, setTextureLoadFailed] = useState(false)
+  // Track loaded textures with state to avoid undefined issues
+  const [loadedTextures, setLoadedTextures] = useState<any>({})
+  const [loadedCloudTexture, setLoadedCloudTexture] = useState<any>(null)
 
   // Determine segment count based on quality setting
   const segments = useMemo(() => lowQuality ? 16 : 64, [lowQuality])
@@ -91,149 +94,153 @@ const Planet = ({
     return { cloudMap }
   }, [cloudMap, lowQuality, textureLoadFailed])
 
-  // Load textures safely with error handling - wrapped in try/catch
-  let textures = {}
-  let cloudTexture = null
-  
-  try {
-    if (Object.keys(textureUrls).length > 0) {
-      // Only try to load textures if we have URLs
-      textures = useTexture(textureUrls, 
-        // Success callback
-        undefined, 
-        // Error callback - must be defined to prevent exceptions from propagating
-        (err) => {
-          console.error('Failed to load planet textures:', err)
-          // Mark as failed for future reference but don't update state during render
-          // will be handled in an effect below
-          if (onError) {
-            onError(err)
-          }
-        }
-      )
-    }
-    
-    // Only try to load cloud texture if we have a URL
-    if (cloudTextureUrl) {
-      try {
-        const cloudTextures = useTexture(cloudTextureUrl)
-        cloudTexture = cloudTextures.cloudMap
-      } catch (err) {
-        // Silently fail for cloud textures - they're optional
-        cloudTexture = null
-      }
-    }
-  } catch (err) {
-    // Log error but don't throw - we'll handle it with fallback rendering
-    console.error('Error loading planet textures:', err)
-    // Notify parent if callback is provided
-    if (onError) {
-      onError(err)
-    }
-  }
-  
-  // Handle texture loading errors in an effect, not during render
+  // Load textures in an effect to avoid render-time issues
   useEffect(() => {
-    if (Object.keys(textureUrls).length > 0 && 
-        (!textures || !textures.map)) {
-      // If we should have textures but don't, mark as failed
-      setTextureLoadFailed(true)
-      // Notify parent if callback is provided
-      if (onError) {
-        onError(new Error("Failed to load required textures"))
+    let isMounted = true;
+    
+    const loadTextures = async () => {
+      // Skip if we've already marked as failed or have no URLs
+      if (textureLoadFailed || Object.keys(textureUrls).length === 0) {
+        return;
       }
-    }
-  }, [textureUrls, textures, onError])
+      
+      try {
+        // Only try to load textures if we have URLs
+        const result = await useTexture(textureUrls);
+        if (isMounted) {
+          setLoadedTextures(result);
+        }
+      } catch (err) {
+        console.error('Failed to load planet textures:', err);
+        if (isMounted) {
+          setTextureLoadFailed(true);
+          if (onError) onError(err);
+        }
+      }
+    };
+    
+    loadTextures();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [textureUrls, textureLoadFailed, onError]);
+  
+  // Load cloud texture in a separate effect
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadCloudTexture = async () => {
+      if (!cloudTextureUrl) return;
+      
+      try {
+        const result = await useTexture(cloudTextureUrl);
+        if (isMounted) {
+          setLoadedCloudTexture(result.cloudMap);
+        }
+      } catch (err) {
+        // Cloud textures are optional, so just log the error
+        console.warn('Failed to load cloud texture:', err);
+      }
+    };
+    
+    loadCloudTexture();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [cloudTextureUrl]);
   
   // Apply texture optimizations if textures loaded successfully
   useEffect(() => {
     try {
-      if (!textureLoadFailed && textures && textures.map) {
-        textures.map.anisotropy = lowQuality ? 1 : 4
-        textures.map.needsUpdate = true
+      // Verify we have loaded textures and they're not empty
+      if (!textureLoadFailed && loadedTextures && loadedTextures.map) {
+        loadedTextures.map.anisotropy = lowQuality ? 1 : 4;
+        loadedTextures.map.needsUpdate = true;
         
         if (!lowQuality) {
-          if (textures.normalMap) {
-            textures.normalMap.anisotropy = lowQuality ? 1 : 4
-            textures.normalMap.needsUpdate = true
+          if (loadedTextures.normalMap) {
+            loadedTextures.normalMap.anisotropy = lowQuality ? 1 : 4;
+            loadedTextures.normalMap.needsUpdate = true;
           }
-          if (textures.roughnessMap) {
-            textures.roughnessMap.anisotropy = lowQuality ? 1 : 4
-            textures.roughnessMap.needsUpdate = true
+          if (loadedTextures.roughnessMap) {
+            loadedTextures.roughnessMap.anisotropy = lowQuality ? 1 : 4;
+            loadedTextures.roughnessMap.needsUpdate = true;
           }
         }
       }
       
-      if (cloudTexture) {
-        cloudTexture.anisotropy = lowQuality ? 1 : 4
-        cloudTexture.needsUpdate = true
+      if (loadedCloudTexture) {
+        loadedCloudTexture.anisotropy = lowQuality ? 1 : 4;
+        loadedCloudTexture.needsUpdate = true;
       }
     } catch (err) {
-      console.error("Error optimizing textures:", err)
+      console.error("Error optimizing textures:", err);
       // Notify parent but don't fail - we can still render
       if (onError) {
-        onError(err)
+        onError(err);
       }
     }
-  }, [textures, cloudTexture, lowQuality, textureLoadFailed, onError])
+  }, [loadedTextures, loadedCloudTexture, lowQuality, textureLoadFailed, onError]);
 
   // Handle interaction state
   useEffect(() => {
     if (hovered && !hasInteracted) {
-      setHasInteracted(true)
+      setHasInteracted(true);
     }
-  }, [hovered, hasInteracted])
+  }, [hovered, hasInteracted]);
 
   useFrame((state, delta) => {
     try {
       // Optimize animations with delta time for consistent speed
-      const deltaMultiplier = delta * 60 // Normalize for 60fps
+      const deltaMultiplier = delta * 60; // Normalize for 60fps
       
       // Only rotate if ref exists
       if (planetRef.current) {
-        planetRef.current.rotation.y += deltaMultiplier * 0.01 * (hovered ? rotationSpeed * 2 : rotationSpeed)
+        planetRef.current.rotation.y += deltaMultiplier * 0.01 * (hovered ? rotationSpeed * 2 : rotationSpeed);
       }
       
       // Only process clouds if the ref and texture exist
-      if (cloudsRef.current && cloudTexture) {
-        cloudsRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 1.5
+      if (cloudsRef.current && loadedCloudTexture) {
+        cloudsRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 1.5;
       }
       
       // Only process rings if the ref exists and rings are enabled
       if (ringsRef.current && hasRings) {
-        ringsRef.current.rotation.x = -0.5
-        ringsRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 0.5
+        ringsRef.current.rotation.x = -0.5;
+        ringsRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 0.5;
       }
       
       // Process atmosphere if ref exists
       if (atmosphereRef.current) {
-        atmosphereRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 0.5
+        atmosphereRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 0.5;
 
         // Pulsing atmosphere effect on hover - simplified when in low quality mode
         if (hovered && !lowQuality) {
-          const scale = 1.2 + Math.sin(state.clock.elapsedTime * 4) * 0.05
-          atmosphereRef.current.scale.set(scale, scale, scale)
+          const scale = 1.2 + Math.sin(state.clock.elapsedTime * 4) * 0.05;
+          atmosphereRef.current.scale.set(scale, scale, scale);
         } else {
-          atmosphereRef.current.scale.set(1.2, 1.2, 1.2)
+          atmosphereRef.current.scale.set(1.2, 1.2, 1.2);
         }
       }
     } catch (err) {
-      console.error("Error in animation frame:", err)
+      console.error("Error in animation frame:", err);
       // Don't propagate error as it would crash the scene
     }
-  })
+  });
 
   // Memoize the click handler to prevent recreating it on each render
   const handleClick = useMemo(() => () => {
     if (overrideLinkEmail) {
-      sendEmail()
+      sendEmail();
     } else {
-      navigate(link)
+      navigate(link);
     }
-  }, [overrideLinkEmail, link, navigate, sendEmail])
+  }, [overrideLinkEmail, link, navigate, sendEmail]);
 
   // If texture loading failed or we're in fallback mode, render a simple colored sphere
-  if (textureLoadFailed) {
+  if (textureLoadFailed || !loadedTextures.map) {
     return (
       <group 
         position={position}
@@ -279,7 +286,7 @@ const Planet = ({
           </Html>
         )}
       </group>
-    )
+    );
   }
 
   // Main render when textures are available
@@ -294,9 +301,9 @@ const Planet = ({
       <mesh ref={planetRef}>
         <sphereGeometry args={[radius, segments, segments]} />
         <meshPhysicalMaterial 
-          map={textures.map}
-          normalMap={textures.normalMap}
-          roughnessMap={textures.roughnessMap}
+          map={loadedTextures.map}
+          normalMap={loadedTextures.normalMap}
+          roughnessMap={loadedTextures.roughnessMap}
           roughness={0.8}
           metalness={0.2}
           emissive={new Color(color)}
@@ -306,11 +313,11 @@ const Planet = ({
       </mesh>
       
       {/* Cloud layer - only render if texture exists and not in low quality mode */}
-      {cloudTexture && !lowQuality && (
+      {loadedCloudTexture && !lowQuality && (
         <mesh ref={cloudsRef} scale={1.02}>
           <sphereGeometry args={[radius, segments, segments]} />
           <meshStandardMaterial 
-            map={cloudTexture}
+            map={loadedCloudTexture}
             transparent={true}
             opacity={0.4}
             depthWrite={false}
@@ -368,7 +375,7 @@ const Planet = ({
         </Html>
       )}
     </group>
-  )
-}
+  );
+};
 
-export default Planet
+export default Planet;
