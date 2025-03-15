@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo } from 'react'
+import { useRef, useState, useEffect, useMemo, Suspense } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Mesh, BackSide, Color, MeshPhysicalMaterial, MeshStandardMaterial, MeshPhongMaterial } from 'three'
 import { Html, useTexture } from '@react-three/drei'
@@ -22,6 +22,21 @@ interface PlanetProps {
   overrideLinkEmail?: boolean
   lowQuality?: boolean // New prop to control level of detail
 }
+
+// Simple fallback component for texture loading errors
+const TextureLoadingFallback = () => (
+  <Html center>
+    <div style={{ 
+      color: 'white', 
+      background: 'rgba(0,0,0,0.7)', 
+      padding: '8px 12px', 
+      borderRadius: '4px',
+      fontSize: '10px'
+    }}>
+      Loading...
+    </div>
+  </Html>
+)
 
 const Planet = ({ 
   position, 
@@ -48,11 +63,15 @@ const Planet = ({
   const [hovered, setHovered] = useState(false)
   const navigate = useNavigate()
   
-  // For texture memory management
+  // Track loading and error states
+  const [hasTextureError, setHasTextureError] = useState(false)
   const [hasInteracted, setHasInteracted] = useState(false)
 
   // Determine segment count based on quality setting
   const segments = useMemo(() => lowQuality ? 16 : 64, [lowQuality])
+  
+  // Fallback to low detail if there's an error
+  const actualSegments = hasTextureError ? Math.min(16, segments) : segments
 
   const sendEmail = () => {
     window.open("mailto:sam.reskala@fullstackmadrid.com")
@@ -80,49 +99,61 @@ const Planet = ({
     return urls
   }, [textureMap, normalMap, roughnessMap, lowQuality])
   
-  // Load textures with optimized settings
-  const textures = useTexture(textureUrls)
-  
-  // Apply texture optimizations
-  useEffect(() => {
-    if (textures.map) {
-      textures.map.anisotropy = textureOptions.anisotropy
-      textures.map.needsUpdate = true
-    }
+  // Load textures with optimized settings - use try-catch pattern
+  let textures;
+  try {
+    textures = useTexture(textureUrls)
     
-    // Only process these in high quality mode if they exist
-    if (!lowQuality) {
-      if (textures.normalMap) {
-        textures.normalMap.anisotropy = textureOptions.anisotropy
-        textures.normalMap.needsUpdate = true
+    // Apply texture optimizations in effect
+    useEffect(() => {
+      if (textures.map) {
+        textures.map.anisotropy = textureOptions.anisotropy
+        textures.map.needsUpdate = true
       }
-      if (textures.roughnessMap) {
-        textures.roughnessMap.anisotropy = textureOptions.anisotropy
-        textures.roughnessMap.needsUpdate = true
+      
+      // Only process these in high quality mode if they exist
+      if (!lowQuality) {
+        if (textures.normalMap) {
+          textures.normalMap.anisotropy = textureOptions.anisotropy
+          textures.normalMap.needsUpdate = true
+        }
+        if (textures.roughnessMap) {
+          textures.roughnessMap.anisotropy = textureOptions.anisotropy
+          textures.roughnessMap.needsUpdate = true
+        }
       }
-    }
-    
-    // Cleanup function to prevent memory leaks
-    return () => {
-      // No need to dispose textures - drei's useTexture handles this
-    }
-  }, [textures, textureOptions, lowQuality])
+    }, [textures, textureOptions, lowQuality])
+  } catch (err) {
+    console.error('Error loading planet textures:', err)
+    setHasTextureError(true)
+    // Use empty object to avoid errors
+    textures = {}
+  }
 
-  // Load cloud map separately with optimized settings - only if needed
+  // Only attempt to load cloud texture if we have a URL and quality setting allows
   const cloudTextureUrl = useMemo(() => 
-    !lowQuality && cloudMap ? { cloudMap } : null
-  , [cloudMap, lowQuality])
+    !lowQuality && cloudMap && !hasTextureError ? { cloudMap } : null
+  , [cloudMap, lowQuality, hasTextureError])
   
-  // Only load cloud texture if URL is provided and not in low quality mode
-  const cloudTexture = cloudTextureUrl ? useTexture(cloudTextureUrl).cloudMap : null
-
-  // Apply cloud texture optimizations
-  useEffect(() => {
-    if (cloudTexture) {
-      cloudTexture.anisotropy = textureOptions.anisotropy
-      cloudTexture.needsUpdate = true
+  // Load cloud texture conditionally
+  let cloudTexture = null
+  try {
+    if (cloudTextureUrl) {
+      const loadedTextures = useTexture(cloudTextureUrl)
+      cloudTexture = loadedTextures.cloudMap
+      
+      // Apply cloud texture optimizations
+      useEffect(() => {
+        if (cloudTexture) {
+          cloudTexture.anisotropy = textureOptions.anisotropy
+          cloudTexture.needsUpdate = true
+        }
+      }, [cloudTexture, textureOptions])
     }
-  }, [cloudTexture, textureOptions])
+  } catch (err) {
+    console.warn('Failed to load cloud texture:', err)
+    cloudTexture = null
+  }
 
   // Handle interaction state
   useEffect(() => {
@@ -174,6 +205,56 @@ const Planet = ({
     }
   }, [overrideLinkEmail, link, navigate])
 
+  // If texture loading failed, render a simple colored sphere
+  if (hasTextureError) {
+    return (
+      <group 
+        position={position}
+        onPointerOver={() => setHovered(true)}
+        onPointerOut={() => setHovered(false)}
+        onClick={handleClick}
+      >
+        <mesh ref={planetRef}>
+          <sphereGeometry args={[radius, actualSegments / 2, actualSegments / 2]} />
+          <meshStandardMaterial 
+            color={color}
+            roughness={0.7}
+            metalness={0.2} 
+          />
+        </mesh>
+        <mesh ref={atmosphereRef}>
+          <sphereGeometry args={[radius * 1.2, actualSegments / 2, actualSegments / 2]} />
+          <meshPhongMaterial 
+            color={atmosphereColor}
+            transparent={true}
+            opacity={0.3}
+            side={BackSide}
+          />
+        </mesh>
+        {/* Tooltip - only show when hovered */}
+        {hovered && (
+          <Html position={[0, radius * 2, 0]} center style={{ pointerEvents: 'none' }}>
+            <div style={{
+              background: 'rgba(0, 0, 0, 0.8)',
+              color: 'white',
+              padding: '10px 15px',
+              borderRadius: '5px',
+              whiteSpace: 'nowrap',
+              fontSize: '14px',
+              fontFamily: 'Arial, sans-serif',
+              backdropFilter: 'blur(4px)',
+              transform: 'translateY(-20px)',
+            }}>
+              <strong>{name}</strong>
+              <br />
+              {description}
+            </div>
+          </Html>
+        )}
+      </group>
+    )
+  }
+
   return (
     <group 
       position={position}
@@ -183,7 +264,7 @@ const Planet = ({
     >
       {/* Planet core with adaptive detail */}
       <mesh ref={planetRef}>
-        <sphereGeometry args={[radius, segments, segments]} />
+        <sphereGeometry args={[radius, actualSegments, actualSegments]} />
         <meshPhysicalMaterial 
           map={textures.map}
           normalMap={textures.normalMap}
@@ -199,7 +280,7 @@ const Planet = ({
       {/* Cloud layer - only render if texture exists and not in low quality mode */}
       {cloudTexture && !lowQuality && (
         <mesh ref={cloudsRef} scale={1.02}>
-          <sphereGeometry args={[radius, segments, segments]} />
+          <sphereGeometry args={[radius, actualSegments, actualSegments]} />
           <meshStandardMaterial 
             map={cloudTexture}
             transparent={true}
@@ -212,7 +293,7 @@ const Planet = ({
       {/* Rings - only render if explicitly enabled and not in low quality mode */}
       {hasRings && !lowQuality && (
         <mesh ref={ringsRef}>
-          <ringGeometry args={[radius * 1.4, radius * 2.2, segments]} />
+          <ringGeometry args={[radius * 1.4, radius * 2.2, actualSegments]} />
           <meshStandardMaterial 
             color={ringColor}
             transparent={true}
@@ -226,8 +307,8 @@ const Planet = ({
       <mesh ref={atmosphereRef}>
         <sphereGeometry args={[
           radius * 1.2, 
-          lowQuality ? Math.max(8, segments / 2) : segments, 
-          lowQuality ? Math.max(8, segments / 2) : segments
+          lowQuality ? Math.max(8, actualSegments / 2) : actualSegments, 
+          lowQuality ? Math.max(8, actualSegments / 2) : actualSegments
         ]} />
         <meshPhongMaterial 
           color={atmosphereColor}
