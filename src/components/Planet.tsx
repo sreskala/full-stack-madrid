@@ -174,24 +174,6 @@ const Planet = ({
     }
   }, [overrideLinkEmail, link, navigate])
 
-  // Safely get material properties based on quality
-  const getMaterialProps = useMemo(() => {
-    const props: Record<string, any> = {
-      map: textures.map,
-      roughness: 0.8,
-      metalness: 0.2,
-      emissive: new Color(color),
-      emissiveIntensity: hovered ? 0.2 : 0,
-      envMapIntensity: lowQuality ? 0.5 : 1.5,
-    }
-    
-    // Only add these props if the textures exist
-    if (textures.normalMap) props.normalMap = textures.normalMap
-    if (textures.roughnessMap) props.roughnessMap = textures.roughnessMap
-    
-    return props
-  }, [textures, color, hovered, lowQuality])
-
   return (
     <group 
       position={position}
@@ -202,7 +184,16 @@ const Planet = ({
       {/* Planet core with adaptive detail */}
       <mesh ref={planetRef}>
         <sphereGeometry args={[radius, segments, segments]} />
-        <meshPhysicalMaterial {...getMaterialProps} />
+        <meshPhysicalMaterial 
+          map={textures.map}
+          normalMap={textures.normalMap}
+          roughnessMap={textures.roughnessMap}
+          roughness={0.8}
+          metalness={0.2}
+          emissive={new Color(color)}
+          emissiveIntensity={hovered ? 0.2 : 0}
+          envMapIntensity={lowQuality ? 0.5 : 1.5}
+        />
       </mesh>
       
       {/* Cloud layer - only render if texture exists and not in low quality mode */}
