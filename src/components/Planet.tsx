@@ -77,13 +77,13 @@ const Planet = ({
   }, [textureMap, normalMap, roughnessMap, lowQuality])
   
   // Load textures - guaranteed to be safe
-  let textures = {}
-  let cloudTexture = null
+  let textures = {} as any
+  let cloudTexture: any = null
   
   try {
-    // Only load textures if not in fallback mode
+    // Only load textures if not in fallback modce
     if (!renderFallback) {
-      textures = useTexture(textureProps)
+      textures = useTexture(textureProps.map)
       
       // Load cloud texture separately if needed
       if (cloudMap && !lowQuality) {

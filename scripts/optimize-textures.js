@@ -10,10 +10,14 @@
  * 2. Run: node scripts/optimize-textures.js
  */
 
-const fs = require('fs');
-const path = require('path');
-const glob = require('glob');
-const sharp = require('sharp');
+// const fs = require('fs');
+import fs from 'fs';
+import path from 'path';
+import {glob} from 'glob';
+import sharp from 'sharp';
+// const path = require('path');
+// const glob = require('glob');
+// const sharp = require('sharp');
 
 // Configuration
 const config = {
