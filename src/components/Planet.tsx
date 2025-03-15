@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo, Suspense } from 'react'
+import { useRef, useState, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Mesh, BackSide, Color, MeshPhysicalMaterial, MeshStandardMaterial, MeshPhongMaterial } from 'three'
 import { Html, useTexture } from '@react-three/drei'
@@ -22,21 +22,6 @@ interface PlanetProps {
   overrideLinkEmail?: boolean
   lowQuality?: boolean // New prop to control level of detail
 }
-
-// Simple fallback component for texture loading errors
-const TextureLoadingFallback = () => (
-  <Html center>
-    <div style={{ 
-      color: 'white', 
-      background: 'rgba(0,0,0,0.7)', 
-      padding: '8px 12px', 
-      borderRadius: '4px',
-      fontSize: '10px'
-    }}>
-      Loading...
-    </div>
-  </Html>
-)
 
 const Planet = ({ 
   position, 
@@ -63,28 +48,26 @@ const Planet = ({
   const [hovered, setHovered] = useState(false)
   const navigate = useNavigate()
   
-  // Track loading and error states
-  const [hasTextureError, setHasTextureError] = useState(false)
+  // For texture memory management
   const [hasInteracted, setHasInteracted] = useState(false)
+  // Use state instead of direct variable for error tracking to avoid re-render loop
+  const [textureLoadFailed, setTextureLoadFailed] = useState(false)
 
   // Determine segment count based on quality setting
   const segments = useMemo(() => lowQuality ? 16 : 64, [lowQuality])
   
-  // Fallback to low detail if there's an error
-  const actualSegments = hasTextureError ? Math.min(16, segments) : segments
-
-  const sendEmail = () => {
+  // Memoize the sendEmail function to prevent recreating it on each render
+  const sendEmail = useMemo(() => () => {
     window.open("mailto:sam.reskala@fullstackmadrid.com")
-  }
+  }, [])
 
-  // Use a memo to avoid recreating texture options on every render
-  const textureOptions = useMemo(() => ({
-    anisotropy: lowQuality ? 1 : 4,
-    encoding: 3001, // sRGB encoding
-  }), [lowQuality])
-
-  // Correctly handle texture loading in different quality modes
+  // Memoize texture URLs to prevent unnecessary re-loading
   const textureUrls = useMemo(() => {
+    // Don't try to load textures if previous attempts failed
+    if (textureLoadFailed) {
+      return {}
+    }
+    
     // Always include the main texture map
     const urls: Record<string, string> = {
       map: textureMap
@@ -97,63 +80,84 @@ const Planet = ({
     }
     
     return urls
-  }, [textureMap, normalMap, roughnessMap, lowQuality])
+  }, [textureMap, normalMap, roughnessMap, lowQuality, textureLoadFailed])
   
-  // Load textures with optimized settings - use try-catch pattern
-  let textures;
+  // Memoize cloud texture URL to prevent unnecessary re-loading
+  const cloudTextureUrl = useMemo(() => {
+    if (textureLoadFailed || lowQuality || !cloudMap) {
+      return null
+    }
+    return { cloudMap }
+  }, [cloudMap, lowQuality, textureLoadFailed])
+
+  // Load textures safely with error handling - wrapped in try/catch
+  let textures = {}
+  let cloudTexture = null
+  
   try {
-    textures = useTexture(textureUrls)
+    if (Object.keys(textureUrls).length > 0) {
+      // Only try to load textures if we have URLs
+      textures = useTexture(textureUrls, 
+        // Success callback
+        undefined, 
+        // Error callback - must be defined to prevent exceptions from propagating
+        (err) => {
+          console.error('Failed to load planet textures:', err)
+          // Mark as failed for future reference but don't update state during render
+          // will be handled in an effect below
+        }
+      )
+    }
     
-    // Apply texture optimizations in effect
-    useEffect(() => {
-      if (textures.map) {
-        textures.map.anisotropy = textureOptions.anisotropy
-        textures.map.needsUpdate = true
+    // Only try to load cloud texture if we have a URL
+    if (cloudTextureUrl) {
+      try {
+        const cloudTextures = useTexture(cloudTextureUrl)
+        cloudTexture = cloudTextures.cloudMap
+      } catch (err) {
+        // Silently fail for cloud textures - they're optional
+        cloudTexture = null
       }
+    }
+  } catch (err) {
+    // Log error but don't throw - we'll handle it with fallback rendering
+    console.error('Error loading planet textures:', err)
+    // Mark as failed for future reference but don't update state during render
+    // will be handled in an effect below
+  }
+  
+  // Handle texture loading errors in an effect, not during render
+  useEffect(() => {
+    if (Object.keys(textureUrls).length > 0 && 
+        (!textures || !textures.map)) {
+      // If we should have textures but don't, mark as failed
+      setTextureLoadFailed(true)
+    }
+  }, [textureUrls, textures])
+  
+  // Apply texture optimizations if textures loaded successfully
+  useEffect(() => {
+    if (!textureLoadFailed && textures && textures.map) {
+      textures.map.anisotropy = lowQuality ? 1 : 4
+      textures.map.needsUpdate = true
       
-      // Only process these in high quality mode if they exist
       if (!lowQuality) {
         if (textures.normalMap) {
-          textures.normalMap.anisotropy = textureOptions.anisotropy
+          textures.normalMap.anisotropy = lowQuality ? 1 : 4
           textures.normalMap.needsUpdate = true
         }
         if (textures.roughnessMap) {
-          textures.roughnessMap.anisotropy = textureOptions.anisotropy
+          textures.roughnessMap.anisotropy = lowQuality ? 1 : 4
           textures.roughnessMap.needsUpdate = true
         }
       }
-    }, [textures, textureOptions, lowQuality])
-  } catch (err) {
-    console.error('Error loading planet textures:', err)
-    setHasTextureError(true)
-    // Use empty object to avoid errors
-    textures = {}
-  }
-
-  // Only attempt to load cloud texture if we have a URL and quality setting allows
-  const cloudTextureUrl = useMemo(() => 
-    !lowQuality && cloudMap && !hasTextureError ? { cloudMap } : null
-  , [cloudMap, lowQuality, hasTextureError])
-  
-  // Load cloud texture conditionally
-  let cloudTexture = null
-  try {
-    if (cloudTextureUrl) {
-      const loadedTextures = useTexture(cloudTextureUrl)
-      cloudTexture = loadedTextures.cloudMap
-      
-      // Apply cloud texture optimizations
-      useEffect(() => {
-        if (cloudTexture) {
-          cloudTexture.anisotropy = textureOptions.anisotropy
-          cloudTexture.needsUpdate = true
-        }
-      }, [cloudTexture, textureOptions])
     }
-  } catch (err) {
-    console.warn('Failed to load cloud texture:', err)
-    cloudTexture = null
-  }
+    
+    if (cloudTexture) {
+      cloudTexture.anisotropy = lowQuality ? 1 : 4
+      cloudTexture.needsUpdate = true
+    }
+  }, [textures, cloudTexture, lowQuality, textureLoadFailed])
 
   // Handle interaction state
   useEffect(() => {
@@ -196,17 +200,17 @@ const Planet = ({
     }
   })
 
-  // Memoize the click handler
+  // Memoize the click handler to prevent recreating it on each render
   const handleClick = useMemo(() => () => {
     if (overrideLinkEmail) {
       sendEmail()
     } else {
       navigate(link)
     }
-  }, [overrideLinkEmail, link, navigate])
+  }, [overrideLinkEmail, link, navigate, sendEmail])
 
-  // If texture loading failed, render a simple colored sphere
-  if (hasTextureError) {
+  // If texture loading failed or we're in fallback mode, render a simple colored sphere
+  if (textureLoadFailed) {
     return (
       <group 
         position={position}
@@ -215,7 +219,7 @@ const Planet = ({
         onClick={handleClick}
       >
         <mesh ref={planetRef}>
-          <sphereGeometry args={[radius, actualSegments / 2, actualSegments / 2]} />
+          <sphereGeometry args={[radius, segments / 2, segments / 2]} />
           <meshStandardMaterial 
             color={color}
             roughness={0.7}
@@ -223,7 +227,7 @@ const Planet = ({
           />
         </mesh>
         <mesh ref={atmosphereRef}>
-          <sphereGeometry args={[radius * 1.2, actualSegments / 2, actualSegments / 2]} />
+          <sphereGeometry args={[radius * 1.2, segments / 2, segments / 2]} />
           <meshPhongMaterial 
             color={atmosphereColor}
             transparent={true}
@@ -255,6 +259,7 @@ const Planet = ({
     )
   }
 
+  // Main render when textures are available
   return (
     <group 
       position={position}
@@ -264,7 +269,7 @@ const Planet = ({
     >
       {/* Planet core with adaptive detail */}
       <mesh ref={planetRef}>
-        <sphereGeometry args={[radius, actualSegments, actualSegments]} />
+        <sphereGeometry args={[radius, segments, segments]} />
         <meshPhysicalMaterial 
           map={textures.map}
           normalMap={textures.normalMap}
@@ -280,7 +285,7 @@ const Planet = ({
       {/* Cloud layer - only render if texture exists and not in low quality mode */}
       {cloudTexture && !lowQuality && (
         <mesh ref={cloudsRef} scale={1.02}>
-          <sphereGeometry args={[radius, actualSegments, actualSegments]} />
+          <sphereGeometry args={[radius, segments, segments]} />
           <meshStandardMaterial 
             map={cloudTexture}
             transparent={true}
@@ -293,7 +298,7 @@ const Planet = ({
       {/* Rings - only render if explicitly enabled and not in low quality mode */}
       {hasRings && !lowQuality && (
         <mesh ref={ringsRef}>
-          <ringGeometry args={[radius * 1.4, radius * 2.2, actualSegments]} />
+          <ringGeometry args={[radius * 1.4, radius * 2.2, segments]} />
           <meshStandardMaterial 
             color={ringColor}
             transparent={true}
@@ -307,8 +312,8 @@ const Planet = ({
       <mesh ref={atmosphereRef}>
         <sphereGeometry args={[
           radius * 1.2, 
-          lowQuality ? Math.max(8, actualSegments / 2) : actualSegments, 
-          lowQuality ? Math.max(8, actualSegments / 2) : actualSegments
+          lowQuality ? Math.max(8, segments / 2) : segments, 
+          lowQuality ? Math.max(8, segments / 2) : segments
         ]} />
         <meshPhongMaterial 
           color={atmosphereColor}
