@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Mesh, BackSide, Color, TextureLoader, RepeatWrapping } from 'three'
+import { Mesh, BackSide, Color, MeshPhysicalMaterial, MeshStandardMaterial, MeshPhongMaterial } from 'three'
 import { Html, useTexture } from '@react-three/drei'
 import { useNavigate } from 'react-router-dom'
 
@@ -64,12 +64,24 @@ const Planet = ({
     encoding: 3001, // sRGB encoding
   }), [lowQuality])
 
+  // Correctly handle texture loading in different quality modes
+  const textureUrls = useMemo(() => {
+    // Always include the main texture map
+    const urls: Record<string, string> = {
+      map: textureMap
+    }
+    
+    // Only add detail textures if not in low quality mode
+    if (!lowQuality) {
+      if (normalMap) urls.normalMap = normalMap
+      if (roughnessMap) urls.roughnessMap = roughnessMap
+    }
+    
+    return urls
+  }, [textureMap, normalMap, roughnessMap, lowQuality])
+  
   // Load textures with optimized settings
-  const textures = useTexture({
-    map: textureMap,
-    normalMap: lowQuality ? null : normalMap, // Skip normal maps in low quality mode
-    roughnessMap: lowQuality ? null : roughnessMap, // Skip roughness maps in low quality mode
-  })
+  const textures = useTexture(textureUrls)
   
   // Apply texture optimizations
   useEffect(() => {
@@ -77,7 +89,8 @@ const Planet = ({
       textures.map.anisotropy = textureOptions.anisotropy
       textures.map.needsUpdate = true
     }
-    // Only process these in high quality mode
+    
+    // Only process these in high quality mode if they exist
     if (!lowQuality) {
       if (textures.normalMap) {
         textures.normalMap.anisotropy = textureOptions.anisotropy
@@ -88,10 +101,20 @@ const Planet = ({
         textures.roughnessMap.needsUpdate = true
       }
     }
+    
+    // Cleanup function to prevent memory leaks
+    return () => {
+      // No need to dispose textures - drei's useTexture handles this
+    }
   }, [textures, textureOptions, lowQuality])
 
-  // Load cloud map separately with optimized settings
-  const cloudTexture = cloudMap && !lowQuality ? useTexture(cloudMap) : null
+  // Load cloud map separately with optimized settings - only if needed
+  const cloudTextureUrl = useMemo(() => 
+    !lowQuality && cloudMap ? { cloudMap } : null
+  , [cloudMap, lowQuality])
+  
+  // Only load cloud texture if URL is provided and not in low quality mode
+  const cloudTexture = cloudTextureUrl ? useTexture(cloudTextureUrl).cloudMap : null
 
   // Apply cloud texture optimizations
   useEffect(() => {
@@ -112,23 +135,23 @@ const Planet = ({
     // Optimize animations with delta time for consistent speed
     const deltaMultiplier = delta * 60 // Normalize for 60fps
     
-    // Only rotate if visible to the camera
+    // Only rotate if ref exists
     if (planetRef.current) {
       planetRef.current.rotation.y += deltaMultiplier * 0.01 * (hovered ? rotationSpeed * 2 : rotationSpeed)
     }
     
-    // Only process clouds if they exist and are not in low quality mode
+    // Only process clouds if the ref and texture exist
     if (cloudsRef.current && cloudTexture) {
       cloudsRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 1.5
     }
     
-    // Only process rings if they exist
+    // Only process rings if the ref exists and rings are enabled
     if (ringsRef.current && hasRings) {
       ringsRef.current.rotation.x = -0.5
       ringsRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 0.5
     }
     
-    // Always process atmosphere
+    // Process atmosphere if ref exists
     if (atmosphereRef.current) {
       atmosphereRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 0.5
 
@@ -151,6 +174,24 @@ const Planet = ({
     }
   }, [overrideLinkEmail, link, navigate])
 
+  // Safely get material properties based on quality
+  const getMaterialProps = useMemo(() => {
+    const props: Record<string, any> = {
+      map: textures.map,
+      roughness: 0.8,
+      metalness: 0.2,
+      emissive: new Color(color),
+      emissiveIntensity: hovered ? 0.2 : 0,
+      envMapIntensity: lowQuality ? 0.5 : 1.5,
+    }
+    
+    // Only add these props if the textures exist
+    if (textures.normalMap) props.normalMap = textures.normalMap
+    if (textures.roughnessMap) props.roughnessMap = textures.roughnessMap
+    
+    return props
+  }, [textures, color, hovered, lowQuality])
+
   return (
     <group 
       position={position}
@@ -161,20 +202,11 @@ const Planet = ({
       {/* Planet core with adaptive detail */}
       <mesh ref={planetRef}>
         <sphereGeometry args={[radius, segments, segments]} />
-        <meshPhysicalMaterial 
-          map={textures.map}
-          normalMap={!lowQuality ? textures.normalMap : null}
-          roughnessMap={!lowQuality ? textures.roughnessMap : null}
-          roughness={0.8}
-          metalness={0.2}
-          emissive={new Color(color)}
-          emissiveIntensity={hovered ? 0.2 : 0}
-          envMapIntensity={lowQuality ? 0.5 : 1.5}
-        />
+        <meshPhysicalMaterial {...getMaterialProps} />
       </mesh>
       
-      {/* Cloud layer - only render in high quality mode or when hovered */}
-      {cloudMap && cloudTexture && !lowQuality && (
+      {/* Cloud layer - only render if texture exists and not in low quality mode */}
+      {cloudTexture && !lowQuality && (
         <mesh ref={cloudsRef} scale={1.02}>
           <sphereGeometry args={[radius, segments, segments]} />
           <meshStandardMaterial 
@@ -201,7 +233,11 @@ const Planet = ({
       
       {/* Atmosphere - simplified in low quality mode */}
       <mesh ref={atmosphereRef}>
-        <sphereGeometry args={[radius * 1.2, lowQuality ? segments / 2 : segments, lowQuality ? segments / 2 : segments]} />
+        <sphereGeometry args={[
+          radius * 1.2, 
+          lowQuality ? Math.max(8, segments / 2) : segments, 
+          lowQuality ? Math.max(8, segments / 2) : segments
+        ]} />
         <meshPhongMaterial 
           color={atmosphereColor}
           transparent={true}
