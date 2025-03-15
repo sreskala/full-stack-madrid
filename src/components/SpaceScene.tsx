@@ -1,7 +1,10 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Stars, Preload, AdaptiveDpr, Html } from '@react-three/drei'
-import { Suspense, lazy, useState, useEffect } from 'react'
+import { Suspense, lazy, useState, useEffect, useCallback } from 'react'
 import MainText from './MainText'
+import { QualityLevel } from './PerformanceManager'
+import { isLowPerformanceDevice } from '../utils/textureUtils'
+import { preloadService } from '../utils/preloadService'
 
 // Lazy load heavy components
 const Planet = lazy(() => import('./Planet'))
@@ -24,11 +27,60 @@ const Loader = () => (
   </Html>
 )
 
+// Error boundary fallback for Three.js components
+const ErrorFallback = () => (
+  <Html center>
+    <div style={{ 
+      color: 'white', 
+      background: 'rgba(255, 0, 0, 0.3)', 
+      padding: '20px', 
+      borderRadius: '5px',
+      fontFamily: 'Arial, sans-serif',
+      textAlign: 'center',
+      border: '1px solid rgba(255, 0, 0, 0.5)'
+    }}>
+      <div>Something went wrong rendering this element</div>
+      <div style={{ marginTop: '10px', fontSize: '12px' }}>
+        Try refreshing the page or using a different browser
+      </div>
+    </div>
+  </Html>
+)
+
+// Component to safely render Planet with error handling
+const SafePlanet = (props) => {
+  // Use error boundary pattern with try/catch
+  try {
+    return <Planet {...props} />
+  } catch (error) {
+    console.error("Error rendering Planet:", error)
+    return <ErrorFallback />
+  }
+}
+
+// Component to safely render AsteroidBelt with error handling
+const SafeAsteroidBelt = (props) => {
+  try {
+    return <AsteroidBelt {...props} />
+  } catch (error) {
+    console.error("Error rendering AsteroidBelt:", error)
+    return <ErrorFallback />
+  }
+}
+
 const SpaceScene = (): JSX.Element => {
   // Add state for reduced quality during interactions
   const [interacting, setInteracting] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
+  const [qualityLevel, setQualityLevel] = useState<QualityLevel>(
+    isLowPerformanceDevice() ? QualityLevel.LOW : QualityLevel.HIGH
+  )
 
+  // Start preloading textures
+  useEffect(() => {
+    preloadService.startPreloading()
+  }, [])
+  
   // Set initial load to false after components are loaded
   useEffect(() => {
     const timer = setTimeout(() => setIsInitialLoad(false), 2000)
@@ -38,6 +90,16 @@ const SpaceScene = (): JSX.Element => {
   // Determine pixel ratio based on device and interaction state
   const pixelRatio = interacting ? 1 : window.devicePixelRatio
 
+  // Handle quality change from PerformanceManager
+  const handleQualityChange = useCallback((quality: QualityLevel) => {
+    setQualityLevel(quality)
+  }, [])
+
+  // Get low quality mode based on interaction state and quality level
+  const getLowQualityMode = useCallback(() => {
+    return interacting || isInitialLoad || qualityLevel === QualityLevel.LOW
+  }, [interacting, isInitialLoad, qualityLevel])
+
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#000000' }}>
       <Canvas 
@@ -46,6 +108,8 @@ const SpaceScene = (): JSX.Element => {
         onPointerDown={() => setInteracting(true)}
         onPointerUp={() => setInteracting(false)}
         performance={{ min: 0.5 }}
+        // Use error boundary to catch rendering errors
+        onError={(e) => console.error("Canvas error:", e)}
       >
         {/* Performance optimizers */}
         <AdaptiveDpr pixelated />
@@ -62,13 +126,13 @@ const SpaceScene = (): JSX.Element => {
         {/* Suspense for lazy loading */}
         <Suspense fallback={<Loader />}>
           {/* Background stars with reduced count */}
-          <Stars radius={100} depth={50} count={isInitialLoad ? 1000 : 3000} factor={4} saturation={0} fade speed={1} />
+          <Stars radius={100} depth={50} count={getLowQualityMode() ? 1000 : 3000} factor={4} saturation={0} fade speed={1} />
           
           {/* Main text */}
           <MainText />
           
-          {/* Interactive Planets */}
-          <Planet 
+          {/* Interactive Planets with error handling */}
+          <SafePlanet 
             position={[-8, 0, -5]} 
             radius={2} 
             color="#ff4455"
@@ -80,9 +144,9 @@ const SpaceScene = (): JSX.Element => {
             textureMap="/textures/planets/Mars_Map.webp"
             normalMap="/textures/planets/mars_1k_normal.jpg"
             roughnessMap="/textures/planets/marsbump1k.jpg"
-            lowQuality={interacting || isInitialLoad}
+            lowQuality={getLowQualityMode()}
           />
-          <Planet 
+          <SafePlanet 
             position={[8, 2, -3]} 
             radius={1.5} 
             color="#44aaff"
@@ -95,9 +159,9 @@ const SpaceScene = (): JSX.Element => {
             normalMap="/textures/planets/earth_normalmap.jpg"
             roughnessMap="/textures/planets/8081_earthbump4k.jpg"
             cloudMap="/textures/planets/earthcloudmap.jpg"
-            lowQuality={interacting || isInitialLoad}
+            lowQuality={getLowQualityMode()}
           />
-          <Planet 
+          <SafePlanet 
             position={[0, -6, -2]} 
             radius={1} 
             color="#ffaa44"
@@ -110,13 +174,13 @@ const SpaceScene = (): JSX.Element => {
             normalMap="/textures/planets/mars_1k_normal.jpg"
             roughnessMap="/textures/planets/plutobump2k.jpg"
             overrideLinkEmail={true}
-            lowQuality={interacting || isInitialLoad}
+            lowQuality={getLowQualityMode()}
           />
 
           {/* Asteroid belts with reduced count during interaction */}
-          <AsteroidBelt 
+          <SafeAsteroidBelt 
             radius={12} 
-            count={interacting || isInitialLoad ? 50 : 200} 
+            count={getLowQualityMode() ? 50 : 200} 
             width={2}
             height={0.2}
           />
