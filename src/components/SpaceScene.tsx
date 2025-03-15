@@ -1,6 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Stars, Preload, AdaptiveDpr, Html } from '@react-three/drei'
-import { Suspense, lazy, useState, useEffect, useCallback, useRef, memo } from 'react'
+import { Suspense, lazy, useState, useEffect, useCallback, useRef, memo, useMemo } from 'react'
 import MainText from './MainText'
 import { QualityLevel } from './PerformanceManager'
 import { isLowPerformanceDevice } from '../utils/textureUtils'
@@ -115,7 +115,7 @@ const SpaceScene = (): JSX.Element => {
   }, [])
 
   // Determine pixel ratio based on device and interaction state
-  const pixelRatio = interacting ? 1 : window.devicePixelRatio
+  const pixelRatio = interacting ? 1 : Math.min(window.devicePixelRatio, 2)
 
   // Handle quality change from PerformanceManager
   const handleQualityChange = useCallback((quality: QualityLevel) => {
@@ -123,7 +123,7 @@ const SpaceScene = (): JSX.Element => {
   }, [])
 
   // Get low quality mode based on interaction state and quality level
-  const getLowQualityMode = useCallback(() => {
+  const lowQualityMode = useMemo(() => {
     return interacting || isInitialLoad || qualityLevel === QualityLevel.LOW
   }, [interacting, isInitialLoad, qualityLevel])
   
@@ -171,8 +171,8 @@ const SpaceScene = (): JSX.Element => {
     textureMap: "/textures/planets/Mars_Map.webp",
     normalMap: "/textures/planets/mars_1k_normal.jpg",
     roughnessMap: "/textures/planets/marsbump1k.jpg",
-    lowQuality: getLowQualityMode()
-  }), [getLowQualityMode])
+    lowQuality: lowQualityMode
+  }), [lowQualityMode])
   
   const planet2Props = useMemo(() => ({
     position: [8, 2, -3] as [number, number, number],
@@ -187,8 +187,8 @@ const SpaceScene = (): JSX.Element => {
     normalMap: "/textures/planets/earth_normalmap.jpg",
     roughnessMap: "/textures/planets/8081_earthbump4k.jpg",
     cloudMap: "/textures/planets/earthcloudmap.jpg",
-    lowQuality: getLowQualityMode()
-  }), [getLowQualityMode])
+    lowQuality: lowQualityMode
+  }), [lowQualityMode])
   
   const planet3Props = useMemo(() => ({
     position: [0, -6, -2] as [number, number, number],
@@ -203,15 +203,26 @@ const SpaceScene = (): JSX.Element => {
     normalMap: "/textures/planets/mars_1k_normal.jpg",
     roughnessMap: "/textures/planets/plutobump2k.jpg",
     overrideLinkEmail: true,
-    lowQuality: getLowQualityMode()
-  }), [getLowQualityMode])
+    lowQuality: lowQualityMode
+  }), [lowQualityMode])
   
   const asteroidBeltProps = useMemo(() => ({
     radius: 12,
-    count: getLowQualityMode() ? 50 : 200,
+    count: lowQualityMode ? 50 : 200,
     width: 2,
     height: 0.2
-  }), [getLowQualityMode])
+  }), [lowQualityMode])
+
+  // Stars configuration
+  const starsConfig = useMemo(() => ({
+    radius: 100,
+    depth: 50,
+    count: lowQualityMode ? 1000 : 3000,
+    factor: 4,
+    saturation: 0,
+    fade: true,
+    speed: 1
+  }), [lowQualityMode])
 
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#000000' }}>
@@ -238,8 +249,8 @@ const SpaceScene = (): JSX.Element => {
         
         {/* Main scene content in suspense boundary */}
         <Suspense fallback={<Loader />}>
-          {/* Background stars with reduced count */}
-          <Stars radius={100} depth={50} count={getLowQualityMode() ? 1000 : 3000} factor={4} saturation={0} fade speed={1} />
+          {/* Background stars with memoized config */}
+          <Stars {...starsConfig} />
           
           {/* Main text */}
           <MainText />
