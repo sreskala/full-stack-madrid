@@ -21,6 +21,7 @@ interface PlanetProps {
   ringColor?: string
   overrideLinkEmail?: boolean
   lowQuality?: boolean // New prop to control level of detail
+  onError?: (error: any) => void // Add error callback
 }
 
 const Planet = ({ 
@@ -39,7 +40,8 @@ const Planet = ({
   hasRings,
   ringColor = '#A7A7A7',
   overrideLinkEmail = false,
-  lowQuality = false
+  lowQuality = false,
+  onError // Error callback
 }: PlanetProps): JSX.Element => {
   const planetRef = useRef<Mesh>(null!)
   const atmosphereRef = useRef<Mesh>(null!)
@@ -48,9 +50,8 @@ const Planet = ({
   const [hovered, setHovered] = useState(false)
   const navigate = useNavigate()
   
-  // For texture memory management
+  // Track loading and error states
   const [hasInteracted, setHasInteracted] = useState(false)
-  // Use state instead of direct variable for error tracking to avoid re-render loop
   const [textureLoadFailed, setTextureLoadFailed] = useState(false)
 
   // Determine segment count based on quality setting
@@ -105,6 +106,9 @@ const Planet = ({
           console.error('Failed to load planet textures:', err)
           // Mark as failed for future reference but don't update state during render
           // will be handled in an effect below
+          if (onError) {
+            onError(err)
+          }
         }
       )
     }
@@ -122,8 +126,10 @@ const Planet = ({
   } catch (err) {
     // Log error but don't throw - we'll handle it with fallback rendering
     console.error('Error loading planet textures:', err)
-    // Mark as failed for future reference but don't update state during render
-    // will be handled in an effect below
+    // Notify parent if callback is provided
+    if (onError) {
+      onError(err)
+    }
   }
   
   // Handle texture loading errors in an effect, not during render
@@ -132,32 +138,44 @@ const Planet = ({
         (!textures || !textures.map)) {
       // If we should have textures but don't, mark as failed
       setTextureLoadFailed(true)
+      // Notify parent if callback is provided
+      if (onError) {
+        onError(new Error("Failed to load required textures"))
+      }
     }
-  }, [textureUrls, textures])
+  }, [textureUrls, textures, onError])
   
   // Apply texture optimizations if textures loaded successfully
   useEffect(() => {
-    if (!textureLoadFailed && textures && textures.map) {
-      textures.map.anisotropy = lowQuality ? 1 : 4
-      textures.map.needsUpdate = true
-      
-      if (!lowQuality) {
-        if (textures.normalMap) {
-          textures.normalMap.anisotropy = lowQuality ? 1 : 4
-          textures.normalMap.needsUpdate = true
-        }
-        if (textures.roughnessMap) {
-          textures.roughnessMap.anisotropy = lowQuality ? 1 : 4
-          textures.roughnessMap.needsUpdate = true
+    try {
+      if (!textureLoadFailed && textures && textures.map) {
+        textures.map.anisotropy = lowQuality ? 1 : 4
+        textures.map.needsUpdate = true
+        
+        if (!lowQuality) {
+          if (textures.normalMap) {
+            textures.normalMap.anisotropy = lowQuality ? 1 : 4
+            textures.normalMap.needsUpdate = true
+          }
+          if (textures.roughnessMap) {
+            textures.roughnessMap.anisotropy = lowQuality ? 1 : 4
+            textures.roughnessMap.needsUpdate = true
+          }
         }
       }
+      
+      if (cloudTexture) {
+        cloudTexture.anisotropy = lowQuality ? 1 : 4
+        cloudTexture.needsUpdate = true
+      }
+    } catch (err) {
+      console.error("Error optimizing textures:", err)
+      // Notify parent but don't fail - we can still render
+      if (onError) {
+        onError(err)
+      }
     }
-    
-    if (cloudTexture) {
-      cloudTexture.anisotropy = lowQuality ? 1 : 4
-      cloudTexture.needsUpdate = true
-    }
-  }, [textures, cloudTexture, lowQuality, textureLoadFailed])
+  }, [textures, cloudTexture, lowQuality, textureLoadFailed, onError])
 
   // Handle interaction state
   useEffect(() => {
@@ -167,36 +185,41 @@ const Planet = ({
   }, [hovered, hasInteracted])
 
   useFrame((state, delta) => {
-    // Optimize animations with delta time for consistent speed
-    const deltaMultiplier = delta * 60 // Normalize for 60fps
-    
-    // Only rotate if ref exists
-    if (planetRef.current) {
-      planetRef.current.rotation.y += deltaMultiplier * 0.01 * (hovered ? rotationSpeed * 2 : rotationSpeed)
-    }
-    
-    // Only process clouds if the ref and texture exist
-    if (cloudsRef.current && cloudTexture) {
-      cloudsRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 1.5
-    }
-    
-    // Only process rings if the ref exists and rings are enabled
-    if (ringsRef.current && hasRings) {
-      ringsRef.current.rotation.x = -0.5
-      ringsRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 0.5
-    }
-    
-    // Process atmosphere if ref exists
-    if (atmosphereRef.current) {
-      atmosphereRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 0.5
-
-      // Pulsing atmosphere effect on hover - simplified when in low quality mode
-      if (hovered && !lowQuality) {
-        const scale = 1.2 + Math.sin(state.clock.elapsedTime * 4) * 0.05
-        atmosphereRef.current.scale.set(scale, scale, scale)
-      } else {
-        atmosphereRef.current.scale.set(1.2, 1.2, 1.2)
+    try {
+      // Optimize animations with delta time for consistent speed
+      const deltaMultiplier = delta * 60 // Normalize for 60fps
+      
+      // Only rotate if ref exists
+      if (planetRef.current) {
+        planetRef.current.rotation.y += deltaMultiplier * 0.01 * (hovered ? rotationSpeed * 2 : rotationSpeed)
       }
+      
+      // Only process clouds if the ref and texture exist
+      if (cloudsRef.current && cloudTexture) {
+        cloudsRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 1.5
+      }
+      
+      // Only process rings if the ref exists and rings are enabled
+      if (ringsRef.current && hasRings) {
+        ringsRef.current.rotation.x = -0.5
+        ringsRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 0.5
+      }
+      
+      // Process atmosphere if ref exists
+      if (atmosphereRef.current) {
+        atmosphereRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 0.5
+
+        // Pulsing atmosphere effect on hover - simplified when in low quality mode
+        if (hovered && !lowQuality) {
+          const scale = 1.2 + Math.sin(state.clock.elapsedTime * 4) * 0.05
+          atmosphereRef.current.scale.set(scale, scale, scale)
+        } else {
+          atmosphereRef.current.scale.set(1.2, 1.2, 1.2)
+        }
+      }
+    } catch (err) {
+      console.error("Error in animation frame:", err)
+      // Don't propagate error as it would crash the scene
     }
   })
 
