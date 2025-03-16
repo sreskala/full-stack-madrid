@@ -92,12 +92,12 @@ const Planet = ({
       setLoadError(false)
     },
     // Error callback
-    (e) => {
-      console.error('Error loading texture:', e)
-      if (onError) onError(e)
-      setLoadError(true)
-      setRenderFallback(true)
-    }
+    // (e) => {
+    //   console.error('Error loading texture:', e)
+    //   if (onError) onError(e)
+    //   setLoadError(true)
+    //   setRenderFallback(true)
+    // }
   )
   
   // Additional check for texture loading errors

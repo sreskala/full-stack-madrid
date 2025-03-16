@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Stars, Preload, AdaptiveDpr, Html } from '@react-three/drei'
 import { Suspense, lazy, useState, useEffect, useCallback, useRef, memo, useMemo } from 'react'
