@@ -42,7 +42,6 @@ const Planet = ({
   ringColor = '#A7A7A7',
   overrideLinkEmail = false,
   lowQuality = false,
-  onError
 }: PlanetProps): JSX.Element => {
   const planetRef = useRef<Mesh>(null!)
   const atmosphereRef = useRef<Mesh>(null!)

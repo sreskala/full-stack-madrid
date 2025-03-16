@@ -1,6 +1,6 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { InstancedMesh, Matrix4, Object3D, BufferGeometry, Float32BufferAttribute } from 'three'
+import { InstancedMesh, Matrix4, Object3D, Float32BufferAttribute } from 'three'
 import * as THREE from 'three'
 
 interface AsteroidBeltProps {
