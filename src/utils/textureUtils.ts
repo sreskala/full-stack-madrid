@@ -1,4 +1,4 @@
-import { Texture, TextureLoader, Cache, RepeatWrapping } from 'three';
+import { Texture, TextureLoader, Cache, RepeatWrapping, SRGBColorSpace, LinearFilter } from 'three';
 
 // Singleton texture loader instance
 const textureLoader = new TextureLoader();
@@ -8,6 +8,9 @@ Cache.enabled = true;
 
 // Texture cache to avoid reloading textures
 const textureCache: Record<string, Texture> = {};
+
+// Track failed textures to avoid retrying them
+const failedTextures = new Set<string>();
 
 // Interface for texture loading options
 interface TextureOptions {
@@ -21,7 +24,13 @@ interface TextureOptions {
 /**
  * Load a texture with optimized settings and caching
  */
-export const loadTexture = (url: string, options: TextureOptions = {}): Promise<Texture> => {
+export const loadTexture = (url: string, options: TextureOptions = {}): Promise<Texture | null> => {
+  // Check if this texture has failed before
+  if (failedTextures.has(url)) {
+    console.warn(`Skipping previously failed texture: ${url}`);
+    return Promise.resolve(null);
+  }
+
   // Return from cache if available
   if (textureCache[url]) {
     return Promise.resolve(textureCache[url]);
@@ -32,22 +41,32 @@ export const loadTexture = (url: string, options: TextureOptions = {}): Promise<
     anisotropy = 1,
     repeat = [1, 1],
     flipY = true,
-    encoding = 3001, // sRGB encoding
+    encoding = SRGBColorSpace,
     generateMipmaps = true,
   } = options;
 
   return new Promise((resolve, reject) => {
+    // Add a timeout to catch hanging texture loads
+    const timeoutId = setTimeout(() => {
+      console.warn(`Texture load timeout for ${url}`);
+      failedTextures.add(url);
+      resolve(null);
+    }, 10000); // 10 seconds timeout
+
     textureLoader.load(
       url,
       (texture) => {
+        clearTimeout(timeoutId);
+        
         // Apply settings
         texture.anisotropy = anisotropy;
         texture.wrapS = RepeatWrapping;
         texture.wrapT = RepeatWrapping;
         texture.repeat.set(repeat[0], repeat[1]);
         texture.flipY = flipY;
-        texture.encoding = encoding;
+        texture.colorSpace = encoding;
         texture.generateMipmaps = generateMipmaps;
+        texture.minFilter = generateMipmaps ? texture.minFilter : LinearFilter;
         
         // Cache the texture
         textureCache[url] = texture;
@@ -56,18 +75,25 @@ export const loadTexture = (url: string, options: TextureOptions = {}): Promise<
       },
       undefined, // onProgress not used
       (error) => {
+        clearTimeout(timeoutId);
         console.error(`Error loading texture ${url}:`, error);
-        reject(error);
+        failedTextures.add(url);
+        resolve(null); // Resolve with null instead of rejecting to avoid crashes
       }
     );
   });
 };
 
 /**
- * Preload a set of textures
+ * Preload a set of textures, with more error tolerance
  */
-export const preloadTextures = (urls: string[], options: TextureOptions = {}): Promise<Texture[]> => {
-  return Promise.all(urls.map(url => loadTexture(url, options)));
+export const preloadTextures = (urls: string[], options: TextureOptions = {}): Promise<(Texture | null)[]> => {
+  // Map each URL to a texture loading promise that won't reject
+  const loadPromises = urls.map(url => {
+    return loadTexture(url, options).catch(() => null);
+  });
+  
+  return Promise.all(loadPromises);
 };
 
 /**
@@ -78,6 +104,7 @@ export const releaseTexture = (url: string): void => {
     textureCache[url].dispose();
     delete textureCache[url];
   }
+  failedTextures.delete(url);
 };
 
 /**
@@ -88,6 +115,7 @@ export const clearTextureCache = (): void => {
     textureCache[key].dispose();
   });
   Object.keys(textureCache).length = 0;
+  failedTextures.clear();
 };
 
 /**
@@ -96,8 +124,8 @@ export const clearTextureCache = (): void => {
 export const createLowQualityTexture = (texture: Texture): Texture => {
   const lowQualityTexture = texture.clone();
   lowQualityTexture.generateMipmaps = false;
-  lowQualityTexture.minFilter = 1006; // LinearFilter
-  lowQualityTexture.magFilter = 1006; // LinearFilter
+  lowQualityTexture.minFilter = LinearFilter;
+  lowQualityTexture.magFilter = LinearFilter;
   lowQualityTexture.anisotropy = 1;
   return lowQualityTexture;
 };
@@ -128,7 +156,7 @@ export const getOptimalTextureSettings = (): TextureOptions => {
   return {
     anisotropy: isLowPerf ? 1 : 4,
     generateMipmaps: !isLowPerf,
-    encoding: 3001, // sRGB encoding
+    encoding: SRGBColorSpace,
   };
 };
 
@@ -156,4 +184,12 @@ export const getPlanetTextures = (
     normalMap: normalMap,
     roughnessMap: roughnessMap
   };
+};
+
+/**
+ * Check if a URL is a valid image path
+ */
+export const isImageUrl = (url: string): boolean => {
+  if (!url) return false;
+  return /\.(jpe?g|png|gif|webp|bmp)$/i.test(url);
 };
