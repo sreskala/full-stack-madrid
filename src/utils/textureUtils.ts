@@ -45,7 +45,7 @@ export const loadTexture = (url: string, options: TextureOptions = {}): Promise<
     generateMipmaps = true,
   } = options;
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve, _) => {
     // Add a timeout to catch hanging texture loads
     const timeoutId = setTimeout(() => {
       console.warn(`Texture load timeout for ${url}`);
@@ -64,7 +64,7 @@ export const loadTexture = (url: string, options: TextureOptions = {}): Promise<
         texture.wrapT = RepeatWrapping;
         texture.repeat.set(repeat[0], repeat[1]);
         texture.flipY = flipY;
-        texture.colorSpace = encoding;
+        texture.colorSpace = String(encoding);
         texture.generateMipmaps = generateMipmaps;
         texture.minFilter = generateMipmaps ? texture.minFilter : LinearFilter;
         
@@ -144,7 +144,7 @@ export const isLowPerformanceDevice = (): boolean => {
   const hasLowMemory = 'deviceMemory' in navigator && (navigator as any).deviceMemory < 4;
   const hasFewCores = navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4;
   
-  return isMobile || isSmallScreen || hasLowMemory || hasFewCores;
+  return isMobile || isSmallScreen || hasLowMemory || (typeof hasFewCores === 'number' ? hasFewCores === 0 ? false : true : hasFewCores);
 };
 
 /**
@@ -156,7 +156,7 @@ export const getOptimalTextureSettings = (): TextureOptions => {
   return {
     anisotropy: isLowPerf ? 1 : 4,
     generateMipmaps: !isLowPerf,
-    encoding: SRGBColorSpace,
+    // encoding: SRGBColorSpace,
   };
 };
 

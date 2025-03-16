@@ -84,7 +84,9 @@ class PreloadService {
       
       // Cloud maps (least priority)
       Object.values(planetTextures).forEach(planet => {
+        //@ts-ignore
         if (planet.cloudMap && isImageUrl(planet.cloudMap)) 
+        //@ts-ignore
           queue.push(planet.cloudMap);
       });
     }
