@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Mesh, BackSide, Color, TextureLoader } from 'three'
+import { Mesh, BackSide, Color } from 'three'
 import { Html, useTexture } from '@react-three/drei'
 import { useNavigate } from 'react-router-dom'
 
@@ -63,49 +63,49 @@ const Planet = ({
     window.open("mailto:sam.reskala@fullstackmadrid.com")
   }, [])
   
-  // Create texture URLs based on quality
-  const textureProps = useMemo(() => {
-    if (lowQuality) {
-      return { map: textureMap }
-    } else {
-      return { 
-        map: textureMap,
-        normalMap,
-        roughnessMap
-      }
-    }
-  }, [textureMap, normalMap, roughnessMap, lowQuality])
+  // Use inline texture loading with error handling
+  const [loadError, setLoadError] = useState(false)
   
-  // Load textures - guaranteed to be safe
-  let textures = {} as any
-  let cloudTexture: any = null
-  
-  try {
-    // Only load textures if not in fallback modce
-    if (!renderFallback) {
-      textures = useTexture(textureProps.map)
-      
-      // Load cloud texture separately if needed
-      if (cloudMap && !lowQuality) {
-        const cloudTextures = useTexture({ cloudMap })
-        cloudTexture = cloudTextures.cloudMap
-      }
-    }
-  } catch (error) {
-    // If loading fails, switch to fallback rendering
-    console.error('Error loading textures:', error)
-    if (onError) onError(error)
+  // Create a single texture object for simpler loading
+  const textureUrls = useMemo(() => {
+    const urls: Record<string, string> = {}
     
-    // Instead of updating state directly (which causes re-render issues),
-    // we'll check in useEffect if textures.map exists
-  }
+    // Always include the map texture
+    if (textureMap) {
+      urls.map = textureMap
+    }
+    
+    // Add additional textures for high quality mode
+    if (!lowQuality) {
+      if (normalMap) urls.normalMap = normalMap
+      if (roughnessMap) urls.roughnessMap = roughnessMap
+      if (cloudMap) urls.cloudMap = cloudMap
+    }
+    
+    return urls
+  }, [textureMap, normalMap, roughnessMap, cloudMap, lowQuality])
   
-  // Check if textures loaded properly and switch to fallback if needed
-  useEffect(() => {
-    if (!textures || !textures.map) {
+  // Handle loading textures with proper error catching
+  const textures = useTexture(textureUrls, 
+    // Success callback
+    () => {
+      setLoadError(false)
+    },
+    // Error callback
+    (e) => {
+      console.error('Error loading texture:', e)
+      if (onError) onError(e)
+      setLoadError(true)
       setRenderFallback(true)
     }
-  }, [textures])
+  )
+  
+  // Additional check for texture loading errors
+  useEffect(() => {
+    if (!textures || !textures.map || loadError) {
+      setRenderFallback(true)
+    }
+  }, [textures, loadError])
   
   // Handle interaction state
   useEffect(() => {
@@ -123,7 +123,7 @@ const Planet = ({
         planetRef.current.rotation.y += deltaMultiplier * 0.01 * (hovered ? rotationSpeed * 2 : rotationSpeed)
       }
       
-      if (cloudsRef.current && cloudTexture) {
+      if (cloudsRef.current && textures.cloudMap) {
         cloudsRef.current.rotation.y += deltaMultiplier * 0.01 * rotationSpeed * 1.5
       }
       
@@ -206,7 +206,12 @@ const Planet = ({
     )
   }
   
-  // Main render with textures
+  // Main render with textures - Only render if textures loaded successfully
+  if (!textures) {
+    // Return an empty group while textures are loading
+    return <group position={position} />
+  }
+  
   return (
     <group 
       position={position}
@@ -230,11 +235,11 @@ const Planet = ({
       </mesh>
       
       {/* Cloud layer */}
-      {cloudTexture && !lowQuality && (
+      {textures.cloudMap && !lowQuality && (
         <mesh ref={cloudsRef} scale={1.02}>
           <sphereGeometry args={[radius, segments, segments]} />
           <meshStandardMaterial 
-            map={cloudTexture}
+            map={textures.cloudMap}
             transparent={true}
             opacity={0.4}
             depthWrite={false}
