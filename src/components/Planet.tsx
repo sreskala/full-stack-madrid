@@ -195,6 +195,7 @@ const Planet = ({
               fontFamily: 'Arial, sans-serif',
               backdropFilter: 'blur(4px)',
               transform: 'translateY(-20px)',
+              cursor: 'pointer'
             }}>
               <strong>{name}</strong>
               <br />

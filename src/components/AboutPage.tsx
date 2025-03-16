@@ -35,12 +35,14 @@ import {
   HardDrive
 } from 'lucide-react';
 import './AboutSection.css';
+import { useNavigate } from 'react-router-dom';
 
 const AboutSection = () => {
+  const navigate = useNavigate();
   return (
     <div className="about-container">
+      <button onClick={() => navigate("/")} className='back-home-button'>Back to home</button>
       <h2 className="about-title">Why Learn With Me?</h2>
-      
       <div className="about-intro">
         <p>
           As a trilingual full-stack software engineer with experience across cutting-edge technologies,

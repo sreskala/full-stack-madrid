@@ -13,6 +13,7 @@ import {
   Loader
 } from 'lucide-react';
 import './LearningPaths.css';
+import { useNavigate } from 'react-router-dom';
 
 const LearningPaths = () => {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -25,6 +26,7 @@ const LearningPaths = () => {
     goals: '',
     selectedPath: ''
   });
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Initialize EmailJS
@@ -227,6 +229,7 @@ const LearningPaths = () => {
 
   return (
     <div className="learning-paths-container">
+      <button onClick={() => navigate("/")} className='back-home-button'>Back to home</button>
       <div className="paths-header">
         <h1>Learning Paths</h1>
         <p>Click on a learning path to learn more details about the course</p>
