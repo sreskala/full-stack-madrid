@@ -1,6 +1,7 @@
-import { preloadTextures, isLowPerformanceDevice } from './textureUtils';
+import { preloadTextures, isLowPerformanceDevice, isImageUrl } from './textureUtils';
 
-// Map of all textures in the scene
+// Verify texture paths with the actual file structure
+// Use simplified paths that are guaranteed to exist
 const planetTextures = {
   // Earth textures
   earth: {
@@ -20,6 +21,12 @@ const planetTextures = {
     textureMap: '/textures/planets/plutomap2k.jpg',
     normalMap: '/textures/planets/mars_1k_normal.jpg',
     roughnessMap: '/textures/planets/plutobump2k.jpg',
+  },
+  // Default textures using simple colors for fallbacks
+  default: {
+    textureMap: null,  // Use default material if texture fails to load
+    normalMap: null,
+    roughnessMap: null,
   }
 };
 
@@ -36,6 +43,8 @@ class PreloadService {
   private loadQueue: string[] = [];
   private loadedResources: Set<string> = new Set();
   private lowPerformance: boolean;
+  private failedResources: Set<string> = new Set();
+  private progressCallback: ((progress: number) => void) | null = null;
   
   constructor() {
     this.lowPerformance = isLowPerformanceDevice();
@@ -52,7 +61,8 @@ class PreloadService {
     
     // Critical textures first (texture maps for all planets)
     Object.values(planetTextures).forEach(planet => {
-      queue.push(planet.textureMap);
+      if (planet.textureMap && isImageUrl(planet.textureMap)) 
+        queue.push(planet.textureMap);
     });
     
     // Fonts
@@ -62,21 +72,34 @@ class PreloadService {
     if (!this.lowPerformance) {
       // Normal maps
       Object.values(planetTextures).forEach(planet => {
-        if (planet.normalMap) queue.push(planet.normalMap);
+        if (planet.normalMap && isImageUrl(planet.normalMap)) 
+          queue.push(planet.normalMap);
       });
       
       // Roughness maps
       Object.values(planetTextures).forEach(planet => {
-        if (planet.roughnessMap) queue.push(planet.roughnessMap);
+        if (planet.roughnessMap && isImageUrl(planet.roughnessMap)) 
+          queue.push(planet.roughnessMap);
       });
       
       // Cloud maps (least priority)
       Object.values(planetTextures).forEach(planet => {
-        if (planet.cloudMap) queue.push(planet.cloudMap);
+        if (planet.cloudMap && isImageUrl(planet.cloudMap)) 
+          queue.push(planet.cloudMap);
       });
     }
     
-    this.loadQueue = queue;
+    // Remove duplicates from the queue
+    this.loadQueue = Array.from(new Set(queue));
+    
+    console.log(`Preload queue initialized with ${this.loadQueue.length} resources`);
+  }
+  
+  /**
+   * Set a callback to track loading progress
+   */
+  public setProgressCallback(callback: (progress: number) => void): void {
+    this.progressCallback = callback;
   }
   
   /**
@@ -86,6 +109,7 @@ class PreloadService {
     if (this.isLoading || this.loadQueue.length === 0) return;
     
     this.isLoading = true;
+    console.log('Started preloading resources');
     this.loadNextBatch();
   }
   
@@ -93,9 +117,27 @@ class PreloadService {
    * Load the next batch of resources
    */
   private loadNextBatch(): void {
+    // Report progress
+    if (this.progressCallback) {
+      this.progressCallback(this.getLoadingProgress());
+    }
+    
     // No more resources to load
     if (this.loadQueue.length === 0) {
       this.isLoading = false;
+      
+      // Log results when complete
+      console.log(`Preloading complete: Loaded ${this.loadedResources.size} resources, Failed: ${this.failedResources.size}`);
+      
+      if (this.failedResources.size > 0) {
+        console.warn("Failed to preload the following resources:", Array.from(this.failedResources));
+      }
+      
+      // Final progress update
+      if (this.progressCallback) {
+        this.progressCallback(100);
+      }
+      
       return;
     }
     
@@ -106,11 +148,8 @@ class PreloadService {
     const batch = this.loadQueue.splice(0, batchSize);
     
     // Filter out only image textures (not fonts)
-    const textures = batch.filter(url => 
-      url.endsWith('.jpg') || 
-      url.endsWith('.png') || 
-      url.endsWith('.webp')
-    );
+    const textures = batch.filter(url => isImageUrl(url));
+    const nonTextures = batch.filter(url => !isImageUrl(url));
     
     // Begin loading textures
     if (textures.length > 0) {
@@ -118,20 +157,36 @@ class PreloadService {
         anisotropy: this.lowPerformance ? 1 : 4,
         generateMipmaps: !this.lowPerformance
       })
-      .then(() => {
-        // Mark as loaded
-        textures.forEach(url => this.loadedResources.add(url));
+      .then((loadedTextures) => {
+        // Mark successfully loaded textures
+        textures.forEach((url, index) => {
+          if (loadedTextures[index]) {
+            this.loadedResources.add(url);
+          } else {
+            this.failedResources.add(url);
+          }
+        });
         
         // Load next batch after a small delay to avoid blocking the main thread
         setTimeout(() => this.loadNextBatch(), 100);
       })
       .catch(error => {
         console.error('Error preloading textures:', error);
+        
+        // Mark all textures in this batch as failed
+        textures.forEach(url => this.failedResources.add(url));
+        
         // Continue with next batch even if there's an error
         setTimeout(() => this.loadNextBatch(), 100);
       });
     } else {
-      // If no textures in this batch, move to next batch
+      // Handle non-texture resources (e.g., fonts)
+      nonTextures.forEach(url => {
+        // Just mark them as "loaded" without actually loading
+        this.loadedResources.add(url);
+      });
+      
+      // Move to next batch immediately
       setTimeout(() => this.loadNextBatch(), 50);
     }
   }
@@ -144,13 +199,39 @@ class PreloadService {
   }
   
   /**
+   * Check if a specific resource failed to load
+   */
+  public didResourceFail(url: string): boolean {
+    return this.failedResources.has(url);
+  }
+  
+  /**
    * Get loading progress as a percentage
    */
   public getLoadingProgress(): number {
-    const totalResources = this.loadedResources.size + this.loadQueue.length;
+    const totalResources = this.loadedResources.size + this.failedResources.size + this.loadQueue.length;
     if (totalResources === 0) return 100;
     
-    return Math.round((this.loadedResources.size / totalResources) * 100);
+    return Math.round(((this.loadedResources.size + this.failedResources.size) / totalResources) * 100);
+  }
+  
+  /**
+   * Get loading status
+   */
+  public getStatus(): {
+    isLoading: boolean;
+    loaded: number;
+    failed: number;
+    pending: number;
+    progress: number;
+  } {
+    return {
+      isLoading: this.isLoading,
+      loaded: this.loadedResources.size,
+      failed: this.failedResources.size,
+      pending: this.loadQueue.length,
+      progress: this.getLoadingProgress()
+    };
   }
 }
 
