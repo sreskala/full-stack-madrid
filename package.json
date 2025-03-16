@@ -16,10 +16,12 @@
     "@react-three/fiber": "^8.17.14",
     "@tailwindcss/vite": "^4.0.6",
     "@types/three": "^0.173.0",
+    "glob": "^11.0.1",
     "lucide-react": "^0.475.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.1.5",
+    "sharp": "^0.33.5",
     "three": "^0.173.0"
   },
   "devDependencies": {
